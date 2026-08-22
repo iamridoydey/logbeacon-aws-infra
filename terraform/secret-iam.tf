@@ -1,16 +1,28 @@
+# =============================================================
+#                    AWS ACCOUNT ID
+# =============================================================
+
 data "aws_caller_identity" "current" {}
 
-resource "aws_iam_role" "secret_role" {
-  name = "secret-role-${var.environment}"
+
+# =============================================================
+#          WORKLOAD CLUSTER - EXTERNAL SECRETS
+# =============================================================
+
+resource "aws_iam_role" "workload_external_secrets_role" {
+  name = "workload-external-secrets-role-${var.environment}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
+
     Statement = [
       {
         Effect = "Allow"
+
         Principal = {
           Service = "pods.eks.amazonaws.com"
         }
+
         Action = [
           "sts:AssumeRole",
           "sts:TagSession"
@@ -20,13 +32,14 @@ resource "aws_iam_role" "secret_role" {
   })
 
   tags = {
-    Name        = "secret-role"
+    Name        = "workload-external-secrets-role"
     Environment = var.environment
   }
 }
 
-resource "aws_iam_policy" "secret_manager" {
-  name = "logbeacon-secret-manager-${var.environment}"
+
+resource "aws_iam_policy" "workload_external_secrets" {
+  name = "workload-external-secrets-${var.environment}"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -34,39 +47,125 @@ resource "aws_iam_policy" "secret_manager" {
     Statement = [
       {
         Effect = "Allow"
+
         Action = [
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret"
         ]
+
         Resource = "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:logbeacon/*"
       }
     ]
   })
 }
 
-resource "aws_iam_role_policy_attachment" "secret_policy_attach" {
-  role       = aws_iam_role.secret_role.name
-  policy_arn = aws_iam_policy.secret_manager.arn
+
+resource "aws_iam_role_policy_attachment" "workload_external_secrets" {
+  role       = aws_iam_role.workload_external_secrets_role.name
+  policy_arn = aws_iam_policy.workload_external_secrets.arn
 }
 
-module "secret_pod_identity" {
+
+module "workload_external_secrets_pod_identity" {
   source  = "terraform-aws-modules/eks-pod-identity/aws"
   version = "~> 1.0"
 
-  name = "secret-pod-identity"
+  name = "workload-external-secrets-pod-identity"
 
   associations = {
-    secret = {
+    external_secrets = {
       cluster_name    = module.workload_eks.cluster_name
       namespace       = "external-secrets"
       service_account = "external-secrets"
-      role_arn        = aws_iam_role.secret_role.arn
+      role_arn        = aws_iam_role.workload_external_secrets_role.arn
     }
   }
 
   tags = {
     Environment = var.environment
-    Name        = "secret-pod-identity"
+    Name        = "workload-external-secrets-pod-identity"
+  }
+}
+
+
+# =============================================================
+#        MANAGEMENT CLUSTER - EXTERNAL SECRETS
+# =============================================================
+
+resource "aws_iam_role" "management_external_secrets_role" {
+  name = "management-external-secrets-role-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Principal = {
+          Service = "pods.eks.amazonaws.com"
+        }
+
+        Action = [
+          "sts:AssumeRole",
+          "sts:TagSession"
+        ]
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "management-external-secrets-role"
+    Environment = var.environment
+  }
+}
+
+
+resource "aws_iam_policy" "management_external_secrets" {
+  name = "management-external-secrets-${var.environment}"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+
+        Resource = "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:logbeacon/cloudflare*"
+      }
+    ]
+  })
+}
+
+
+resource "aws_iam_role_policy_attachment" "management_external_secrets" {
+  role       = aws_iam_role.management_external_secrets_role.name
+  policy_arn = aws_iam_policy.management_external_secrets.arn
+}
+
+
+module "management_external_secrets_pod_identity" {
+  source  = "terraform-aws-modules/eks-pod-identity/aws"
+  version = "~> 1.0"
+
+  name = "management-external-secrets-pod-identity"
+
+  associations = {
+    external_secrets = {
+      cluster_name    = module.management_eks.cluster_name
+      namespace       = "external-secrets"
+      service_account = "external-secrets"
+      role_arn        = aws_iam_role.management_external_secrets_role.arn
+    }
   }
 
+  tags = {
+    Environment = var.environment
+    Name        = "management-external-secrets-pod-identity"
+  }
 }

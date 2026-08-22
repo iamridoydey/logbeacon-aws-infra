@@ -75,31 +75,16 @@ module "workload_eks" {
 
     # ---------------------------------------------------------
     # ArgoCD running in MANAGEMENT cluster
+    #
+    # This allows the ArgoCD IAM role to authenticate to
+    # the workload EKS cluster as a cluster administrator.
     # ---------------------------------------------------------
 
     argocd = {
-      principal_arn = aws_iam_role.management_cluster_role.arn
+      principal_arn = aws_iam_role.argocd_workload_eks_role.arn
 
       policy_associations = {
         argocd = {
-          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-
-          access_scope = {
-            type = "cluster"
-          }
-        }
-      }
-    }
-
-    # ---------------------------------------------------------
-    # GitHub Actions infrastructure bootstrap
-    # ---------------------------------------------------------
-
-    infra_bootstrap_ci = {
-      principal_arn = module.logbeacon_infra_bootstrap_ci_role.arn
-
-      policy_associations = {
-        infra_bootstrap_ci = {
           policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
           access_scope = {
@@ -190,6 +175,9 @@ module "management_eks" {
 
     # ---------------------------------------------------------
     # GitHub Actions infrastructure bootstrap
+    #
+    # The infrastructure CI role bootstraps and manages the
+    # management cluster.
     # ---------------------------------------------------------
 
     infra_bootstrap_ci = {
