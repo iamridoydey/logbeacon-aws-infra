@@ -58,8 +58,8 @@ module "secret_pod_identity" {
   associations = {
     secret = {
       cluster_name    = module.workload_eks.cluster_name
-      namespace       = "kube-system"
-      service_account = "secret-sa"
+      namespace       = "external-secrets"
+      service_account = "external-secrets"
       role_arn        = aws_iam_role.secret_role.arn
     }
   }
