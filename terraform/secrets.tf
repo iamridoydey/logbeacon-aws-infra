@@ -1,13 +1,24 @@
-resource "aws_secretsmanager_secret" "logbeacon_app_secret" {
-  name        = "logbeacon-app-secret"
-  description = "Logbeacon app credentials."
+data "aws_caller_identity" "current" {}
+
+# =============================================================
+# LogBeacon Application Secret
+# =============================================================
+
+resource "aws_secretsmanager_secret" "logbeacon_app" {
+  name        = "logbeacon/app"
+  description = "LogBeacon application credentials."
+
+  tags = {
+    Name        = "logbeacon-app"
+    Environment = var.environment
+  }
 }
 
-resource "aws_secretsmanager_secret_version" "logbeacon_app_secret_val" {
-  secret_id = aws_secretsmanager_secret.logbeacon_app_secret.id
+resource "aws_secretsmanager_secret_version" "logbeacon_app" {
+  secret_id = aws_secretsmanager_secret.logbeacon_app.id
 
   secret_string = jsonencode({
-    # Backend env
+    # Backend
     SQLALCHEMY_TRACK_MODIFICATIONS = var.logbeacon_secrets.sqlalchemy_track_modifications
     SECRET_KEY                     = var.logbeacon_secrets.secret_key
     GROQ_API_KEY                   = var.logbeacon_secrets.groq_api_key
@@ -15,18 +26,85 @@ resource "aws_secretsmanager_secret_version" "logbeacon_app_secret_val" {
     CHAT_RETENTION_DAYS            = var.logbeacon_secrets.chat_retention_days
     MAX_ERROR_LENGTH               = var.logbeacon_secrets.max_error_length
     PRICE_PER_MILLION_TOKENS       = var.logbeacon_secrets.price_per_million_tokens
-    SMTP_HOST                      = var.logbeacon_secrets.smtp_host
-    SMTP_PORT                      = var.logbeacon_secrets.smtp_port
-    SMTP_USER                      = var.logbeacon_secrets.smtp_user
-    SMTP_PASSWORD                  = var.logbeacon_secrets.smtp_password
-    FROM_EMAIL                     = var.logbeacon_secrets.from_email
 
-    # Frontend env
+    # Frontend
     SESSION_SECRET = var.logbeacon_secrets.session_secret
+  })
+}
 
-    # Postgresql env
+
+# =============================================================
+# LogBeacon PostgreSQL Secret
+# =============================================================
+
+resource "aws_secretsmanager_secret" "logbeacon_database" {
+  name        = "logbeacon/database"
+  description = "LogBeacon PostgreSQL credentials."
+
+  tags = {
+    Name        = "logbeacon-database"
+    Environment = var.environment
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "logbeacon_database" {
+  secret_id = aws_secretsmanager_secret.logbeacon_database.id
+
+  secret_string = jsonencode({
     POSTGRES_USER     = var.logbeacon_secrets.postgres_user
     POSTGRES_PASSWORD = var.logbeacon_secrets.postgres_password
     POSTGRES_DB       = var.logbeacon_secrets.postgres_db
+  })
+}
+
+
+# =============================================================
+# LogBeacon SMTP Secret
+# =============================================================
+
+resource "aws_secretsmanager_secret" "logbeacon_smtp" {
+  name        = "logbeacon/smtp"
+  description = "LogBeacon SMTP credentials."
+
+  tags = {
+    Name        = "logbeacon-smtp"
+    Environment = var.environment
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "logbeacon_smtp" {
+  secret_id = aws_secretsmanager_secret.logbeacon_smtp.id
+
+  secret_string = jsonencode({
+    SMTP_HOST     = var.logbeacon_secrets.smtp_host
+    SMTP_PORT     = var.logbeacon_secrets.smtp_port
+    SMTP_USER     = var.logbeacon_secrets.smtp_user
+    SMTP_PASSWORD = var.logbeacon_secrets.smtp_password
+    FROM_EMAIL    = var.logbeacon_secrets.from_email
+  })
+}
+
+
+# =============================================================
+# LogBeacon Cloudflare Secret
+# =============================================================
+
+resource "aws_secretsmanager_secret" "logbeacon_cloudflare" {
+  name        = "logbeacon/cloudflare"
+  description = "LogBeacon Cloudflare credentials."
+
+  tags = {
+    Name        = "logbeacon-cloudflare"
+    Environment = var.environment
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "logbeacon_cloudflare" {
+  secret_id = aws_secretsmanager_secret.logbeacon_cloudflare.id
+
+  secret_string = jsonencode({
+    ACCOUNT_ID = var.cloudflare_secrets.account_id
+    API_TOKEN  = var.cloudflare_secrets.api_token
+    ZONE_ID    = var.cloudflare_secrets.zone_id
   })
 }
