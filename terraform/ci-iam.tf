@@ -1,4 +1,6 @@
-# Github OIDC provider
+# =============================================================
+# GITHUB OIDC PROVIDER
+# =============================================================
 module "iam_oidc_provider" {
   source    = "terraform-aws-modules/iam/aws//modules/iam-oidc-provider"
 
@@ -9,8 +11,9 @@ module "iam_oidc_provider" {
     Environment = var.environment
   }
 }
-
+# =============================================================
 # logbeacon-app repo ci role
+# =============================================================
 module "logbeacon_app_ci_role" {
   source    = "terraform-aws-modules/iam/aws//modules/iam-role"
   name = "logbeacon-app-ci-role"
@@ -31,18 +34,20 @@ module "logbeacon_app_ci_role" {
 
 
 
-
+# =============================================================
 # logbeacon-infra repo ci role
+# =============================================================
 module "logbeacon_infra_bootstrap_ci_role" {
   source    = "terraform-aws-modules/iam/aws//modules/iam-role"
-  name = "logbeacon-infrabootstrap--ci-role"
+  name = "logbeacon-infrabootstrap-ci-role"
 
   enable_github_oidc = true
 
   oidc_wildcard_subjects = ["repo:iamridoydey/logbeacon-aws-infra:ref:refs/heads/main"]
 
   policies = {
-    EksClusterPolicy = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+    EksClusterPolicy = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
+    workloadEksCredReadWritePolicy = aws_iam_policy.workload_cred_read_write.arn
   }
 
   tags = {

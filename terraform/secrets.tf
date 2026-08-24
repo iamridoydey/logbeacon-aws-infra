@@ -100,3 +100,31 @@ resource "aws_secretsmanager_secret_version" "logbeacon_cloudflare" {
     ZONE_ID    = var.cloudflare_secrets.zone_id
   })
 }
+
+
+
+
+
+
+# =============================================================
+# LogBeacon workload eks credential
+# =============================================================
+
+resource "aws_secretsmanager_secret" "workload_eks_cred" {
+  name        = "workload-eks-cred"
+  description = "LogBeacon workload eks credentials."
+
+  tags = {
+    Name        = "logbeacon-cloudflare"
+    Environment = var.environment
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "workload_eks_cred" {
+  secret_id = aws_secretsmanager_secret.workload_eks_cred.id
+
+  secret_string = jsonencode({
+    SERVER = module.workload_eks.cluster_endpoint
+    CA_DATA = module.workload_eks.cluster_certificate_authority_data
+  })
+}

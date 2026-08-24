@@ -6,9 +6,8 @@ data "aws_caller_identity" "current" {}
 
 
 # =============================================================
-#          WORKLOAD CLUSTER - EXTERNAL SECRETS
+#          WORKLOAD CLUSTER - external secrets role
 # =============================================================
-
 resource "aws_iam_role" "workload_external_secrets_role" {
   name = "workload-external-secrets-role-${var.environment}"
 
@@ -38,6 +37,9 @@ resource "aws_iam_role" "workload_external_secrets_role" {
 }
 
 
+# =============================================================
+#          WORKLOAD CLUSTER - external secrets
+# =============================================================
 resource "aws_iam_policy" "workload_external_secrets" {
   name = "workload-external-secrets-${var.environment}"
 
@@ -89,7 +91,7 @@ module "workload_external_secrets_pod_identity" {
 
 
 # =============================================================
-#        MANAGEMENT CLUSTER - EXTERNAL SECRETS
+#      MANAGEMENT CLUSTER - management external secrets role
 # =============================================================
 
 resource "aws_iam_role" "management_external_secrets_role" {
@@ -120,7 +122,9 @@ resource "aws_iam_role" "management_external_secrets_role" {
   }
 }
 
-
+# =============================================================
+#     MANAGEMENT CLUSTER - management external secrets
+# =============================================================
 resource "aws_iam_policy" "management_external_secrets" {
   name = "management-external-secrets-${var.environment}"
 
@@ -168,4 +172,38 @@ module "management_external_secrets_pod_identity" {
     Environment = var.environment
     Name        = "management-external-secrets-pod-identity"
   }
+}
+
+
+# =============================================================
+#     workload cluster credentials read write policy
+# =============================================================
+resource "aws_iam_policy" "workload_cred_read_write" {
+  name = "workload-cred-read-write-${var.environment}"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:CreateSecret",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:UpdateSecret",
+        ]
+
+        Resource = "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:workload-eks-cred*"
+      }
+    ]
+  })
+}
+
+
+resource "aws_iam_role_policy_attachment" "workload_eks_cred" {
+  role       = aws_iam_role.management_external_secrets_role.name
+  policy_arn = aws_iam_policy.workload_cred_read_write.arn
 }
