@@ -23,7 +23,8 @@ module "logbeacon_app_ci_role" {
   oidc_wildcard_subjects = ["repo:iamridoydey/logbeacon-app:ref:refs/heads/main"]
 
   policies = {
-    EcrReadWrite = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
+    EcrReadWrite = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser",
+    SonarqubeCredReadWrite = aws_iam_policy.sonarqube_cred_read.arn
   }
 
   tags = {
@@ -47,7 +48,7 @@ module "logbeacon_infra_bootstrap_ci_role" {
 
   policies = {
     EksClusterPolicy = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
-    workloadEksCredReadWritePolicy = aws_iam_policy.workload_cred_read_write.arn
+    WorkloadEksCredReadWritePolicy = aws_iam_policy.workload_cred_read_write.arn
   }
 
   tags = {

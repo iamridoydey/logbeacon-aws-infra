@@ -25,8 +25,9 @@ resource "aws_iam_role" "ebs_csi_role" {
 
 resource "aws_iam_role_policy_attachment" "ebs_csi_attach" {
   role       = aws_iam_role.ebs_csi_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEBSCSIDriverPolicy"
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEBSCSIDriverEKSClusterScopedPolicy"
 }
+
 
 module "ebs_csi_pod_identity" {
   source  = "terraform-aws-modules/eks-pod-identity/aws"
@@ -34,12 +35,13 @@ module "ebs_csi_pod_identity" {
 
   name = "ebs-csi-pod-identity"
 
+
   associations = {
     ebs_csi = {
       cluster_name    = module.workload_eks.cluster_name
       namespace       = "kube-system"
       service_account = "ebs-csi-controller-sa"
-      role_arn        = aws_iam_role.ebs_csi_role.arn
+      role_arn = aws_iam_role.ebs_csi_role.arn
     }
   }
 

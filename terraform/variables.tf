@@ -43,6 +43,17 @@ variable "public_subnets" {
   default     = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 }
 
+variable "private_subnets" {
+  description = "Private subnets"
+  type        = list(string)
+
+  default = [
+    "10.0.1.0/24",
+    "10.0.2.0/24",
+    "10.0.3.0/24"
+  ]
+}
+
 
 variable "azs" {
   description = "Availability zones"
@@ -63,18 +74,13 @@ variable "logbeacon_secrets" {
     sqlalchemy_track_modifications = string
     secret_key                     = string
     groq_api_key                   = string
-    groq_model                     = string
-    chat_retention_days            = string
-    max_error_length               = string
-    price_per_million_tokens       = string
-    smtp_host                      = string
-    smtp_port                      = string
+
+    # Email
     smtp_user                      = string
     smtp_password                  = string
     from_email                     = string
 
     # Frontend
-    port           = string
     session_secret = string
 
     # Postgres
@@ -92,5 +98,12 @@ variable "cloudflare_secrets" {
     api_token  = string
     zone_id    = string
   })
+  sensitive = true
+}
+
+
+variable "sonarqube_admin_password" {
+  description = "Sonarqube admin password"
+  type = string
   sensitive = true
 }

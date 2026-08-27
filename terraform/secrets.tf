@@ -10,6 +10,11 @@ resource "aws_secretsmanager_secret" "logbeacon_app" {
     Name        = "logbeacon-app"
     Environment = var.environment
   }
+
+  recovery_window_in_days = 0
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
 resource "aws_secretsmanager_secret_version" "logbeacon_app" {
@@ -17,8 +22,8 @@ resource "aws_secretsmanager_secret_version" "logbeacon_app" {
 
   secret_string = jsonencode({
     # Backend
-    SECRET_KEY                     = var.logbeacon_secrets.secret_key
-    GROQ_API_KEY                   = var.logbeacon_secrets.groq_api_key
+    SECRET_KEY   = var.logbeacon_secrets.secret_key
+    GROQ_API_KEY = var.logbeacon_secrets.groq_api_key
     # Frontend
     SESSION_SECRET = var.logbeacon_secrets.session_secret
   })
@@ -37,6 +42,12 @@ resource "aws_secretsmanager_secret" "logbeacon_database" {
     Name        = "logbeacon-database"
     Environment = var.environment
   }
+
+  recovery_window_in_days = 0
+
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
 resource "aws_secretsmanager_secret_version" "logbeacon_database" {
@@ -62,6 +73,12 @@ resource "aws_secretsmanager_secret" "logbeacon_smtp" {
     Name        = "logbeacon-smtp"
     Environment = var.environment
   }
+
+  recovery_window_in_days = 0
+
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
 resource "aws_secretsmanager_secret_version" "logbeacon_smtp" {
@@ -87,6 +104,12 @@ resource "aws_secretsmanager_secret" "logbeacon_cloudflare" {
     Name        = "logbeacon-cloudflare"
     Environment = var.environment
   }
+
+  recovery_window_in_days = 0
+
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
 resource "aws_secretsmanager_secret_version" "logbeacon_cloudflare" {
@@ -116,13 +139,74 @@ resource "aws_secretsmanager_secret" "workload_eks_cred" {
     Name        = "logbeacon-cloudflare"
     Environment = var.environment
   }
+
+
+  recovery_window_in_days = 0
+
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
 resource "aws_secretsmanager_secret_version" "workload_eks_cred" {
   secret_id = aws_secretsmanager_secret.workload_eks_cred.id
 
   secret_string = jsonencode({
-    SERVER = module.workload_eks.cluster_endpoint
+    SERVER  = module.workload_eks.cluster_endpoint
     CA_DATA = module.workload_eks.cluster_certificate_authority_data
   })
+
 }
+
+
+
+# =============================================================
+# LogBeacon sonarqube admin cred
+# =============================================================
+resource "aws_secretsmanager_secret" "sonarqube_admin_password" {
+  name        = "sonarqube-admin-password"
+  description = "SonarQube admin password "
+
+  tags = {
+    Name        = "sonarqube-admin-password"
+    Environment = var.environment
+  }
+
+  recovery_window_in_days = 0
+
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
+}
+
+
+resource "aws_secretsmanager_secret_version" "sonarqube_admin_password" {
+  secret_id = aws_secretsmanager_secret.sonarqube_admin_password.id
+
+  secret_string = jsonencode({
+    ADMIN_PASSWORD = var.sonarqube_admin_password
+  })
+
+}
+
+
+# =============================================================
+# LogBeacon sonarqube ci credential
+# =============================================================
+
+resource "aws_secretsmanager_secret" "sonarqube_ci_cred" {
+  name        = "sonarqube-ci-cred"
+  description = "Sonarqube ci credentials."
+
+  tags = {
+    Name        = "sonarqube-ci-cred"
+    Environment = var.environment
+  }
+
+  recovery_window_in_days = 0
+
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
+}
+

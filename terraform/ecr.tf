@@ -13,6 +13,7 @@ module "ecr_frontend" {
 
         selection = {
           tagStatus   = "tagged"
+          tagPatternList = ["*"]
           countType   = "imageCountMoreThan"
           countNumber = 50
         }
@@ -60,6 +61,7 @@ module "ecr_backend" {
 
         selection = {
           tagStatus   = "tagged"
+          tagPatternList = ["*"]
           countType   = "imageCountMoreThan"
           countNumber = 50
         }

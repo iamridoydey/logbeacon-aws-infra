@@ -1,5 +1,6 @@
 # =============================================================
 #                    WORKLOAD EKS CLUSTER
+#                         PRIVATE
 # =============================================================
 
 module "workload_eks" {
@@ -28,6 +29,7 @@ module "workload_eks" {
 
     aws-ebs-csi-driver = {
       most_recent = true
+      resolve_conflicts_on_create = "OVERWRITE"
     }
   }
 
@@ -35,7 +37,11 @@ module "workload_eks" {
   # EKS API
   # -----------------------------------------------------------
 
-  endpoint_public_access = true
+  # Workload cluster is private.
+  # ArgoCD in the management cluster accesses the API through
+  # the VPC.
+  endpoint_public_access  = true
+  endpoint_private_access = true
 
   enable_cluster_creator_admin_permissions = true
 
@@ -43,11 +49,19 @@ module "workload_eks" {
   # NETWORKING
   # -----------------------------------------------------------
 
-  vpc_id = module.vpc.default_vpc_id
+  vpc_id = module.vpc.vpc_id
 
-  subnet_ids = module.vpc.public_subnets
+  # Workload nodes are private.
+  subnet_ids = module.vpc.private_subnets
 
-  control_plane_subnet_ids = module.vpc.public_subnets
+  # Control-plane ENIs are also placed in private subnets.
+  control_plane_subnet_ids = module.vpc.private_subnets
+
+  # Keep the EKS-managed cluster security group and add our
+  # custom security group for additional network rules.
+  additional_security_group_ids = [
+    module.workload_eks_security_group.id
+  ]
 
   # -----------------------------------------------------------
   # MANAGED NODE GROUP
@@ -61,9 +75,9 @@ module "workload_eks" {
         "t3.xlarge"
       ]
 
-      min_size     = 3
+      min_size     = 2
       desired_size = 3
-      max_size     = 5
+      max_size     = 4
     }
   }
 
@@ -72,12 +86,10 @@ module "workload_eks" {
   # -----------------------------------------------------------
 
   access_entries = {
-
     # ---------------------------------------------------------
-    # ArgoCD running in MANAGEMENT cluster
+    # ArgoCD running in the MANAGEMENT cluster.
     #
-    # This allows the ArgoCD IAM role to authenticate to
-    # the workload EKS cluster as a cluster administrator.
+    # Allows ArgoCD to authenticate to the workload cluster.
     # ---------------------------------------------------------
 
     argocd = {
@@ -98,12 +110,14 @@ module "workload_eks" {
   tags = {
     Environment = var.environment
     Name        = "${var.project_name}-workload-cluster"
+    Cluster     = "workload"
   }
 }
 
 
 # =============================================================
 #                  MANAGEMENT EKS CLUSTER
+#                          PUBLIC
 # =============================================================
 
 module "management_eks" {
@@ -135,7 +149,12 @@ module "management_eks" {
   # EKS API
   # -----------------------------------------------------------
 
-  endpoint_public_access = true
+  # Public API is required for GitHub Actions bootstrap.
+  #
+  # Private access is also enabled so resources inside the VPC
+  # can communicate with the API through the private endpoint.
+  endpoint_public_access  = true
+  endpoint_private_access = true
 
   enable_cluster_creator_admin_permissions = true
 
@@ -143,11 +162,19 @@ module "management_eks" {
   # NETWORKING
   # -----------------------------------------------------------
 
-  vpc_id = module.vpc.default_vpc_id
+  vpc_id = module.vpc.vpc_id
 
+  # Management nodes are currently placed in public subnets.
   subnet_ids = module.vpc.public_subnets
 
+  # Control-plane ENIs are placed in public subnets.
   control_plane_subnet_ids = module.vpc.public_subnets
+
+  # Keep the EKS-managed cluster security group and add our
+  # custom security group for additional network rules.
+  additional_security_group_ids = [
+    module.management_eks_security_group.id
+  ]
 
   # -----------------------------------------------------------
   # MANAGED NODE GROUP
@@ -163,7 +190,7 @@ module "management_eks" {
 
       min_size     = 2
       desired_size = 2
-      max_size     = 3
+      max_size     = 2
     }
   }
 
@@ -172,12 +199,11 @@ module "management_eks" {
   # -----------------------------------------------------------
 
   access_entries = {
-
     # ---------------------------------------------------------
-    # GitHub Actions infrastructure bootstrap
+    # GitHub Actions infrastructure bootstrap.
     #
-    # The infrastructure CI role bootstraps and manages the
-    # management cluster.
+    # Allows the infrastructure CI role to bootstrap and
+    # manage the management cluster.
     # ---------------------------------------------------------
 
     infra_bootstrap_ci = {
@@ -198,5 +224,6 @@ module "management_eks" {
   tags = {
     Environment = var.environment
     Name        = "${var.project_name}-management-cluster"
+    Cluster     = "management"
   }
 }
