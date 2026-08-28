@@ -1,4 +1,18 @@
 # =============================================================
+# ECR
+# =============================================================
+output "frontend_image_url"{
+  description = "Logbeacon frontend image url"
+  value = module.ecr_frontend.repository_url
+}
+
+output "backend_image_url"{
+  description = "Logbeacon backend image url"
+  value = module.ecr_backend.repository_url
+}
+
+
+# =============================================================
 # MANAGEMENT CLUSTER
 # =============================================================
 
