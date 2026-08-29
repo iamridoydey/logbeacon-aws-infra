@@ -181,7 +181,7 @@ module "sonarqube_cred_pod_identity" {
   name = "sonarqube-cred-pod-identity"
 
   associations = {
-    external_secrets = {
+    sonarqube_secrets = {
       cluster_name    = module.workload_eks.cluster_name
       namespace       = "sonarqube-cred"
       service_account = "sonarqube-cred"
