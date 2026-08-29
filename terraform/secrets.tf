@@ -124,6 +124,34 @@ resource "aws_secretsmanager_secret_version" "logbeacon_cloudflare" {
 
 
 
+# =============================================================
+# LogBeacon github Secret
+# =============================================================
+
+resource "aws_secretsmanager_secret" "github_secret" {
+  name        = "github-secret"
+  description = "Github secret"
+
+  tags = {
+    Name        = "github-secret"
+    Environment = var.environment
+  }
+
+  recovery_window_in_days = 0
+
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
+}
+
+resource "aws_secretsmanager_secret_version" "github_secret" {
+  secret_id = aws_secretsmanager_secret.github_secret.id
+
+  secret_string = jsonencode({
+    USERNAME = var.github.username
+    TOKEN  = var.github.token
+  })
+}
 
 
 
