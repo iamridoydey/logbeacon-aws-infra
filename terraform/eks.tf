@@ -177,11 +177,11 @@ module "management_eks" {
 
   vpc_id = module.vpc.vpc_id
 
-  # Management nodes are currently placed in public subnets.
-  subnet_ids = module.vpc.public_subnets
+  # Management nodes are placed in private subnets.
+  subnet_ids = module.vpc.private_subnets
 
-  # Control-plane ENIs are placed in public subnets.
-  control_plane_subnet_ids = module.vpc.public_subnets
+  # Control-plane ENIs are placed in private subnets.
+  control_plane_subnet_ids = module.vpc.private_subnets
 
   # Keep the EKS-managed cluster security group and add our
   # custom security group for additional network rules.
