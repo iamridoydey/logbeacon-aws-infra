@@ -23,7 +23,8 @@ module "vpc" {
   enable_nat_gateway = true
   single_nat_gateway = true
 
-  map_public_ip_on_launch = true
+  # Don't set the public ip on ec2. Since we don't need public ip on ec2
+  # map_public_ip_on_launch = true
 
   tags = {
     Name        = var.project_name
