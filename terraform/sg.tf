@@ -82,3 +82,29 @@ module "workload_eks_security_group" {
     Cluster     = "workload"
   }
 }
+
+
+# =============================================================
+# Logbeacon Admin Security Group for ssm access
+# =============================================================
+resource "aws_security_group" "logbeacon_admin" {
+  name        = "logbeacon-admin-sg-${var.environment}"
+  description = "Security group for LogBeacon admin EC2"
+  vpc_id      = module.vpc.vpc_id
+
+  # No inbound rules required for SSM
+  # ingress = []
+
+  egress {
+    description = "Allow all outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name        = "${var.project_name}-admin-sg"
+    Environment = var.environment
+  }
+}
