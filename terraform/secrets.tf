@@ -148,8 +148,8 @@ resource "aws_secretsmanager_secret_version" "github_secret" {
   secret_id = aws_secretsmanager_secret.github_secret.id
 
   secret_string = jsonencode({
-    USERNAME = var.github.username
-    TOKEN  = var.github.token
+    USERNAME = var.github_secrets.username
+    TOKEN  = var.github_secrets.token
   })
 }
 
