@@ -1,0 +1,8 @@
+- name: Installing tool for logbeacon admin
+  hosts: admin
+  become: true
+
+  roles:
+    - aws-cli
+    - kubectl
+    - helm

@@ -1,0 +1,18 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/kubectl
+- name: Download kubectl
+  ansible.builtin.get_url:
+    url: "https://dl.k8s.io/release/v1.33.0/bin/linux/amd64/kubectl"
+    dest: "/usr/local/bin/kubectl"
+    mode: "0755"
+
+- name: Verify kubectl installation
+  ansible.builtin.command:
+    cmd: "kubectl version --client"
+  register: kubectl_version
+  changed_when: false
+
+- name: Display kubectl version
+  ansible.builtin.debug:
+    msg: "{{ kubectl_version.stdout }}"

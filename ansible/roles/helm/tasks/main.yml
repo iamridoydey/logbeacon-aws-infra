@@ -1,0 +1,24 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for roles/helm
+- name: Download Helm installation script
+  ansible.builtin.get_url:
+    url: "https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3"
+    dest: "/tmp/get_helm.sh"
+    mode: "0755"
+
+- name: Install Helm
+  ansible.builtin.command:
+    cmd: "/tmp/get_helm.sh"
+    # This task will run if this path is not exist
+    creates: "/usr/local/bin/helm"
+
+- name: Verify Helm installation
+  ansible.builtin.command:
+    cmd: "helm version --short"
+  register: helm_version
+  changed_when: false
+
+- name: Display Helm version
+  ansible.builtin.debug:
+    msg: "{{ helm_version.stdout }}"
