@@ -49,7 +49,8 @@ module "logbeacon_infra_bootstrap_ci_role" {
   policies = {
     EksClusterPolicy               = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
     WorkloadEksCredReadWritePolicy = aws_iam_policy.workload_cred_read_write.arn,
-    SsmAdminHostAccess             = aws_iam_policy.infra_ci_ssm_access.arn
+    SsmAdminHostAccess             = aws_iam_policy.infra_ci_ssm_access.arn,
+    SssmAdminS3Access              = aws_iam_policy.ansible_ssm_transfer.arn
   }
 
   tags = {
@@ -81,5 +82,31 @@ resource "aws_iam_policy" "infra_ci_ssm_access" {
         Resource = "*"
       }
     ]
+  })
+}
+
+
+
+# =============================================================
+#     Ansible s3 role
+# =============================================================
+resource "aws_iam_policy" "ansible_ssm_transfer" {
+  name = "logbeacon-ansible-ssm-s3-transfer"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject",
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ]
+      Resource = [
+        aws_s3_bucket.ansible_ssm_transfer.arn,
+        "${aws_s3_bucket.ansible_ssm_transfer.arn}/*"
+      ]
+    }]
   })
 }
