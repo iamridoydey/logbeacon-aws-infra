@@ -109,7 +109,7 @@ module "workload_eks" {
       principal_arn = aws_iam_role.logbeacon_admin_role.arn
 
       policy_associations = {
-        argocd = {
+        admin = {
           policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
           access_scope = {
