@@ -1,0 +1,11 @@
+resource "local_file" "ansible_inventory" {
+  content = templatefile(
+    "${path.module}/templates/inventory.tpl",
+    {
+      instance_id = aws_instance.logbeacon_admin.id
+      aws_region  = var.default_region
+    }
+  )
+
+  filename = "${path.module}/../ansible/inventory.ini"
+}
