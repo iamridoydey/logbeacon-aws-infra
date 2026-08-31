@@ -104,6 +104,19 @@ module "workload_eks" {
           }
         }
       }
+    },
+    logbeacon_admin = {
+      principal_arn = aws_iam_role.logbeacon_admin_role.arn
+
+      policy_associations = {
+        argocd = {
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+          access_scope = {
+            type = "cluster"
+          }
+        }
+      }
     }
   }
 
@@ -211,6 +224,19 @@ module "management_eks" {
 
       policy_associations = {
         infra_bootstrap_ci = {
+          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+          access_scope = {
+            type = "cluster"
+          }
+        }
+      }
+    },
+    logbeacon_admin = {
+      principal_arn = aws_iam_role.logbeacon_admin_role.arn
+
+      policy_associations = {
+        argocd = {
           policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
           access_scope = {
