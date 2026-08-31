@@ -161,7 +161,7 @@ resource "aws_iam_policy" "sonarqube_cred_read" {
           "secretsmanager:GetSecretValue"
         ]
 
-        Resource = aws_secretsmanager_secret.sonarqube_cred.arn
+        Resource = aws_secretsmanager_secret.sonarqube_ci_cred.arn
       }
     ]
   })
@@ -377,8 +377,8 @@ resource "aws_iam_policy" "sonarqube_admin_policy" {
 }
 
 resource "aws_iam_role_policy_attachment" "sonarqube_admin" {
-  role       = aws_iam_role.sonarqube_bootstrap_role.name
-  policy_arn = aws_iam_policy.sonarqube_bootstrap_policy.arn
+  role       = aws_iam_role.sonarqube_admin_role.name
+  policy_arn = aws_iam_policy.sonarqube_admin_policy.arn
 }
 
 
