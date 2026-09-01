@@ -84,10 +84,12 @@ module "workload_es_pod_identity" {
 
 
 
+
+
 # =============================================================
 #          WORKLOAD CLUSTER - sonarqube cred role
 # =============================================================
-resource "aws_iam_role" "sonarqube_cred_role" {
+resource "aws_iam_role" "sonarqube_cred_rwu_role" {
   name = "sonarqube-cred-role-${var.environment}"
 
   assume_role_policy = jsonencode({
@@ -116,11 +118,11 @@ resource "aws_iam_role" "sonarqube_cred_role" {
 }
 
 
-# =============================================================
-#          WORKLOAD CLUSTER - sonarqube cred policy
-# =============================================================
-resource "aws_iam_policy" "sonarqube_cred_policy" {
-  name = "sonarqube-cred-policy-${var.environment}"
+# =======================================================================
+#          WORKLOAD CLUSTER - sonarqube cred read, write, update policy
+# =======================================================================
+resource "aws_iam_policy" "sonarqube_cred_rwu_policy" {
+  name = "sonarqube-cred-rwu-policy-${var.environment}"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -137,40 +139,82 @@ resource "aws_iam_policy" "sonarqube_cred_policy" {
           "secretsmanager:UpdateSecret",
         ]
 
-        Resource = "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:sonarqube-cred*"
+        Resource = "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:sonarqube-ci-cred*"
       }
     ]
   })
 }
 
 
-# =============================================================
-#          LOGBEACON-APP ci - sonarqube cred read policy
-# =============================================================
-resource "aws_iam_policy" "sonarqube_cred_read" {
-  name = "sonarqube-cred-read-${var.environment}"
 
-  policy = jsonencode({
+resource "aws_iam_role_policy_attachment" "sonarqube_cred_rwu" {
+  role       = aws_iam_role.sonarqube_cred_rwu_role.name
+  policy_arn = aws_iam_policy.sonarqube_cred_rwu_policy.arn
+}
+
+
+# =============================================================
+#     Sonarqube admin role
+# =============================================================
+resource "aws_iam_role" "sonarqube_admin_role" {
+  name = "sonarqube-admin-role-${var.environment}"
+
+  assume_role_policy = jsonencode({
     Version = "2012-10-17"
 
     Statement = [
       {
         Effect = "Allow"
 
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ]
+        Principal = {
+          Service = "pods.eks.amazonaws.com"
+        }
 
-        Resource = aws_secretsmanager_secret.sonarqube_ci_cred.arn
+        Action = [
+          "sts:AssumeRole",
+          "sts:TagSession"
+        ]
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "workload-external-secrets-role"
+    Environment = var.environment
+  }
+}
+
+
+
+resource "aws_iam_policy" "sonarqube_admin_policy" {
+  name = "sonarqube-admin-policy-${var.environment}"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "ReadAdminPassword"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = aws_secretsmanager_secret.sonarqube_admin_password.arn
+      },
+      {
+        Sid    = "ManageCiToken"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:CreateSecret",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = aws_secretsmanager_secret.sonarqube_admin_password.arn
       }
     ]
   })
 }
 
-
-resource "aws_iam_role_policy_attachment" "sonarqube_cred" {
-  role       = aws_iam_role.sonarqube_cred_role.name
-  policy_arn = aws_iam_policy.sonarqube_cred_policy.arn
+resource "aws_iam_role_policy_attachment" "sonarqube_admin" {
+  role       = aws_iam_role.sonarqube_admin_role.name
+  policy_arn = aws_iam_policy.sonarqube_admin_policy.arn
 }
 
 
@@ -181,11 +225,18 @@ module "sonarqube_cred_pod_identity" {
   name = "sonarqube-cred-pod-identity"
 
   associations = {
-    sonarqube_secrets = {
+    sonarqube_ci_secrets = {
       cluster_name    = module.workload_eks.cluster_name
-      namespace       = "sonarqube-cred"
-      service_account = "sonarqube-cred"
-      role_arn        = aws_iam_role.sonarqube_cred_role.arn
+      namespace       = "sonarqube"
+      service_account = "sonarqube"
+      role_arn        = aws_iam_role.sonarqube_cred_rwu_role.arn
+    },
+
+    sonarqube_admin = {
+      cluster_name    = module.workload_eks.cluster_name
+      namespace       = "sonarqube"
+      service_account = "sonarqube"
+      role_arn        = aws_iam_role.sonarqube_admin_role.arn
     }
   }
 
@@ -317,95 +368,6 @@ resource "aws_iam_role_policy_attachment" "workload_eks_cred" {
 
 
 
-# =============================================================
-#     Sonarqube admin role
-# =============================================================
-resource "aws_iam_role" "sonarqube_admin_role" {
-  name = "sonarqube-admin-role-${var.environment}"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-
-    Statement = [
-      {
-        Effect = "Allow"
-
-        Principal = {
-          Service = "pods.eks.amazonaws.com"
-        }
-
-        Action = [
-          "sts:AssumeRole",
-          "sts:TagSession"
-        ]
-      }
-    ]
-  })
-
-  tags = {
-    Name        = "workload-external-secrets-role"
-    Environment = var.environment
-  }
-}
-
-
-
-resource "aws_iam_policy" "sonarqube_admin_policy" {
-  name = "sonarqube-admin-policy-${var.environment}"
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid      = "ReadAdminPassword"
-        Effect   = "Allow"
-        Action   = ["secretsmanager:GetSecretValue"]
-        Resource = aws_secretsmanager_secret.sonarqube_admin_password.arn
-      },
-      {
-        Sid    = "ManageCiToken"
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue",
-          "secretsmanager:CreateSecret",
-          "secretsmanager:PutSecretValue",
-          "secretsmanager:DescribeSecret"
-        ]
-        Resource = aws_secretsmanager_secret.sonarqube_admin_password.arn
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "sonarqube_admin" {
-  role       = aws_iam_role.sonarqube_admin_role.name
-  policy_arn = aws_iam_policy.sonarqube_admin_policy.arn
-}
-
-
-
-module "sonarqube_admin_pass_pod_identity" {
-  source  = "terraform-aws-modules/eks-pod-identity/aws"
-  version = "~> 1.0"
-
-  name = "sonarqube-ap-pod-identity"
-
-  associations = {
-    sonarqube_admin = {
-      cluster_name    = module.management_eks.cluster_name
-      namespace       = "sonarqube"
-      service_account = "sonarqube-bootstrap"
-      role_arn        = aws_iam_role.sonarqube_admin_role.arn
-    }
-  }
-
-  tags = {
-    Environment = var.environment
-    Name        = "Sonarqube-admin-password-pod-identity"
-  }
-}
-
-
-
 
 # =============================================================
 #      MANAGEMENT CLUSTER - management github secret
@@ -489,4 +451,30 @@ module "github_secret_pod_identity" {
     Environment = var.environment
     Name        = "github-secret-pod-identity"
   }
+}
+
+
+
+
+# =============================================================
+#          LOGBEACON-APP ci - sonarqube cred read policy
+# =============================================================
+resource "aws_iam_policy" "sonarqube_cred_read" {
+  name = "sonarqube-cred-read-${var.environment}"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Effect = "Allow"
+
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+
+        Resource = aws_secretsmanager_secret.sonarqube_ci_cred.arn
+      }
+    ]
+  })
 }

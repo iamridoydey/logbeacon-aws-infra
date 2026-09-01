@@ -24,7 +24,7 @@ module "logbeacon_app_ci_role" {
 
   policies = {
     EcrReadWrite           = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser",
-    SonarqubeCredReadWrite = aws_iam_policy.sonarqube_cred_read.arn
+    SonarqubeCredRead = aws_iam_policy.sonarqube_cred_read.arn
   }
 
   tags = {
