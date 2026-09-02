@@ -60,7 +60,7 @@ module "logbeacon_infra_bootstrap_ci_role" {
 }
 
 # =============================================================
-# logbeacon-app repo ci role
+#     SSM access policy
 # =============================================================
 resource "aws_iam_policy" "infra_ci_ssm_access" {
   name = "infra-ci-ssm-access-${var.environment}"
