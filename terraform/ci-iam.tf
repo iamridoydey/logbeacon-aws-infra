@@ -23,7 +23,7 @@ module "logbeacon_app_ci_role" {
   oidc_wildcard_subjects = ["repo:iamridoydey/logbeacon-app:ref:refs/heads/main"]
 
   policies = {
-    EcrReadWrite           = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser",
+    EcrReadWrite      = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser",
     SonarqubeCredRead = aws_iam_policy.sonarqube_cred_read.arn
   }
 
@@ -47,10 +47,10 @@ module "logbeacon_infra_bootstrap_ci_role" {
   oidc_wildcard_subjects = ["repo:iamridoydey/logbeacon-aws-infra:ref:refs/heads/main"]
 
   policies = {
-    EksClusterPolicy               = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
-    WorkloadEksCredReadWritePolicy = aws_iam_policy.workload_cred_read_write.arn,
-    SsmAdminHostAccess             = aws_iam_policy.infra_ci_ssm_access.arn,
-    SssmAdminS3Access              = aws_iam_policy.ansible_ssm_transfer.arn
+    EksClusterPolicy          = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy",
+    WorkloadEksCredReadPolicy = aws_iam_policy.workload_eks_cred_read_policy.arn,
+    SsmAdminHostAccess        = aws_iam_policy.infra_ci_ssm_access.arn,
+    SssmAdminS3Access         = aws_iam_policy.ansible_ssm_transfer.arn
   }
 
   tags = {
