@@ -3,13 +3,14 @@
 # =============================================================
 
 resource "aws_iam_role" "workload_secrets_role" {
-  name = "workload-secrets-role-${var.environment}"
+  name = "workload-secrets-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
 
     Statement = [
       {
+        Sid    = "AllowWorkloadExternalSecretsPodIdentity"
         Effect = "Allow"
 
         Principal = {
@@ -20,14 +21,24 @@ resource "aws_iam_role" "workload_secrets_role" {
           "sts:AssumeRole",
           "sts:TagSession"
         ]
+
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/eks-cluster-arn"            = module.workload_eks.cluster_arn
+            "aws:RequestTag/kubernetes-namespace"       = "external-secrets"
+            "aws:RequestTag/kubernetes-service-account" = "external-secrets"
+          }
+        }
       }
     ]
   })
 
-  tags = {
-    Name        = "workload-secrets-role"
-    Environment = var.environment
-  }
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "workload-secrets-role"
+    }
+  )
 }
 
 
@@ -36,7 +47,7 @@ resource "aws_iam_role" "workload_secrets_role" {
 # =============================================================
 
 resource "aws_iam_policy" "logbeacon_secrets_policy" {
-  name = "logbeacon-secrets-policy-${var.environment}"
+  name = "logbeacon-secrets-policy"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -55,6 +66,13 @@ resource "aws_iam_policy" "logbeacon_secrets_policy" {
       }
     ]
   })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "logbeacon-secrets-policy"
+    }
+  )
 }
 
 
@@ -87,10 +105,12 @@ module "workload_secrets_pod_identity" {
     }
   }
 
-  tags = {
-    Environment = var.environment
-    Name        = "workload-secrets-pod-identity"
-  }
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "workload-secrets-pod-identity"
+    }
+  )
 }
 
 
@@ -99,13 +119,14 @@ module "workload_secrets_pod_identity" {
 # =============================================================
 
 resource "aws_iam_role" "sonarqube_bootstrap_role" {
-  name = "sonarqube-bootstrap-role-${var.environment}"
+  name = "sonarqube-bootstrap-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
 
     Statement = [
       {
+        Sid    = "AllowSonarqubeBootstrapPodIdentity"
         Effect = "Allow"
 
         Principal = {
@@ -116,14 +137,24 @@ resource "aws_iam_role" "sonarqube_bootstrap_role" {
           "sts:AssumeRole",
           "sts:TagSession"
         ]
+
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/eks-cluster-arn"            = module.workload_eks.cluster_arn
+            "aws:RequestTag/kubernetes-namespace"       = "sonarqube"
+            "aws:RequestTag/kubernetes-service-account" = "sonarqube"
+          }
+        }
       }
     ]
   })
 
-  tags = {
-    Name        = "sonarqube-bootstrap-role"
-    Environment = var.environment
-  }
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "sonarqube-bootstrap-role"
+    }
+  )
 }
 
 
@@ -132,7 +163,7 @@ resource "aws_iam_role" "sonarqube_bootstrap_role" {
 # =============================================================
 
 resource "aws_iam_policy" "sonarqube_bootstrap_policy" {
-  name = "sonarqube-bootstrap-policy-${var.environment}"
+  name = "sonarqube-bootstrap-policy"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -164,6 +195,13 @@ resource "aws_iam_policy" "sonarqube_bootstrap_policy" {
       }
     ]
   })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "sonarqube-bootstrap-policy"
+    }
+  )
 }
 
 
@@ -196,10 +234,12 @@ module "sonarqube_bootstrap_pod_identity" {
     }
   }
 
-  tags = {
-    Environment = var.environment
-    Name        = "sonarqube-bootstrap-pod-identity"
-  }
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "sonarqube-bootstrap-pod-identity"
+    }
+  )
 }
 
 
@@ -208,13 +248,14 @@ module "sonarqube_bootstrap_pod_identity" {
 # =============================================================
 
 resource "aws_iam_role" "management_secrets_role" {
-  name = "management-secrets-role-${var.environment}"
+  name = "management-secrets-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
 
     Statement = [
       {
+        Sid    = "AllowManagementExternalSecretsPodIdentity"
         Effect = "Allow"
 
         Principal = {
@@ -225,23 +266,40 @@ resource "aws_iam_role" "management_secrets_role" {
           "sts:AssumeRole",
           "sts:TagSession"
         ]
+
+        Condition = {
+          StringEquals = {
+            "aws:RequestTag/eks-cluster-arn"            = module.management_eks.cluster_arn
+            "aws:RequestTag/kubernetes-namespace"       = "external-secrets"
+            "aws:RequestTag/kubernetes-service-account" = "external-secrets"
+          }
+        }
       }
     ]
   })
 
-  tags = {
-    Name        = "management-secrets-role"
-    Environment = var.environment
-  }
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "management-secrets-role"
+    }
+  )
 }
 
 
 # =============================================================
-#       MANAGEMENT CLUSTER - CLOUDFLARE SECRET POLICY
+#       MANAGEMENT CLUSTER - SECRETS POLICY
+# =============================================================
+#
+# These permissions belong specifically to the management
+# External Secrets controller.
+#
+# Cloudflare and GitHub permissions are kept together because
+# they are consumed by the same controller role.
 # =============================================================
 
 resource "aws_iam_policy" "management_secret_policy" {
-  name = "cloudflare-secret-policy-${var.environment}"
+  name = "management-secrets-policy"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -258,6 +316,7 @@ resource "aws_iam_policy" "management_secret_policy" {
 
         Resource = "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:logbeacon/cloudflare*"
       },
+
       {
         Sid    = "ReadGithubSecret"
         Effect = "Allow"
@@ -271,15 +330,27 @@ resource "aws_iam_policy" "management_secret_policy" {
       }
     ]
   })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "management-secrets-policy"
+    }
+  )
 }
 
 
 # ===========================================================================
-# MANAGEMENT CLUSTER - WORKLOAD EKS CREDENTIAL READ POLICY (USED: ci-iam.tf)
+# MANAGEMENT CLUSTER - WORKLOAD EKS CREDENTIAL READ POLICY
+#
+# This policy is intentionally separate because it is reused by:
+#
+#   1. Management External Secrets
+#   2. Infrastructure CI
+#
 # ===========================================================================
-
 resource "aws_iam_policy" "workload_eks_cred_read_policy" {
-  name = "workload-eks-cred-read-policy-${var.environment}"
+  name = "workload-eks-cred-read-policy"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -298,8 +369,14 @@ resource "aws_iam_policy" "workload_eks_cred_read_policy" {
       }
     ]
   })
-}
 
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "workload-eks-cred-read-policy"
+    }
+  )
+}
 
 
 # =============================================================
@@ -316,7 +393,6 @@ resource "aws_iam_role_policy_attachment" "workload_eks_cred_read_attachment" {
   role       = aws_iam_role.management_secrets_role.name
   policy_arn = aws_iam_policy.workload_eks_cred_read_policy.arn
 }
-
 
 
 # =============================================================
@@ -338,19 +414,27 @@ module "management_secrets_pod_identity" {
     }
   }
 
-  tags = {
-    Environment = var.environment
-    Name        = "management-secrets-pod-identity"
-  }
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "management-secrets-pod-identity"
+    }
+  )
 }
 
 
 # =============================================================
 #       LOGBEACON APP CI - SONARQUBE CREDENTIAL READ POLICY
 # =============================================================
+#
+# This policy is intentionally separate.
+#
+# The SonarQube bootstrap Job can READ/WRITE the CI token,
+# while the application CI can only READ it.
+# =============================================================
 
 resource "aws_iam_policy" "sonarqube_cred_read" {
-  name = "sonarqube-cred-read-${var.environment}"
+  name = "sonarqube-cred-read"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -368,4 +452,11 @@ resource "aws_iam_policy" "sonarqube_cred_read" {
       }
     ]
   })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "sonarqube-cred-read"
+    }
+  )
 }

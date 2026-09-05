@@ -3,7 +3,7 @@
 # =============================================================
 
 resource "aws_iam_role" "logbeacon_admin_role" {
-  name = "logbeacon-admin-role-${var.environment}"
+  name = "logbeacon-admin-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -21,10 +21,12 @@ resource "aws_iam_role" "logbeacon_admin_role" {
     ]
   })
 
-  tags = {
-    Name        = "logbeacon-admin-role"
-    Environment = var.environment
-  }
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "logbeacon-admin-role"
+    }
+  )
 }
 
 
@@ -33,7 +35,7 @@ resource "aws_iam_role" "logbeacon_admin_role" {
 # =============================================================
 
 resource "aws_iam_policy" "logbeacon_admin_policy" {
-  name = "logbeacon-admin-policy-${var.environment}"
+  name = "logbeacon-admin-policy"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -62,6 +64,13 @@ resource "aws_iam_policy" "logbeacon_admin_policy" {
       }
     ]
   })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "logbeacon-admin-policy"
+    }
+  )
 }
 
 
@@ -90,6 +99,14 @@ resource "aws_iam_role_policy_attachment" "logbeacon_admin_ssm" {
 # =============================================================
 
 resource "aws_iam_instance_profile" "logbeacon_admin" {
-  name = "logbeacon-admin-${var.environment}"
+  name = "logbeacon-admin"
+
   role = aws_iam_role.logbeacon_admin_role.name
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "logbeacon-admin"
+    }
+  )
 }

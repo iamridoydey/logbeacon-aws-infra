@@ -1,6 +1,5 @@
 # =============================================================
 #                    WORKLOAD EKS CLUSTER
-#                         PRIVATE
 # =============================================================
 
 module "workload_eks" {
@@ -9,6 +8,7 @@ module "workload_eks" {
 
   name               = "${var.project_name}-workload-cluster"
   kubernetes_version = "1.33"
+
 
   # -----------------------------------------------------------
   # EKS ADDONS
@@ -29,21 +29,30 @@ module "workload_eks" {
 
     aws-ebs-csi-driver = {
       most_recent = true
+
       resolve_conflicts_on_create = "OVERWRITE"
     }
   }
 
+
   # -----------------------------------------------------------
-  # EKS API
+  # EKS API ENDPOINT
   # -----------------------------------------------------------
 
-  # Workload cluster is private.
-  # ArgoCD in the management cluster accesses the API through
-  # the VPC.
-  endpoint_public_access  = true
+  # Workload Kubernetes API is accessible only through
+  # the VPC/private endpoint.
+  #
+  # Argo CD runs inside the management cluster in the same VPC,
+  # so it can reach the workload EKS API privately.
+  #
+  # The admin EC2 instance also reaches the cluster through
+  # the private endpoint.
+  endpoint_public_access  = false
   endpoint_private_access = true
 
-  enable_cluster_creator_admin_permissions = true
+  # Explicit access entries are defined below.
+  enable_cluster_creator_admin_permissions = false
+
 
   # -----------------------------------------------------------
   # NETWORKING
@@ -51,17 +60,16 @@ module "workload_eks" {
 
   vpc_id = module.vpc.vpc_id
 
-  # Workload nodes are private.
+  # Worker nodes run in private subnets.
   subnet_ids = module.vpc.private_subnets
 
-  # Control-plane ENIs are also placed in private subnets.
+  # EKS control-plane ENIs are attached to private subnets.
   control_plane_subnet_ids = module.vpc.private_subnets
 
-  # Keep the EKS-managed cluster security group and add our
-  # custom security group for additional network rules.
   additional_security_group_ids = [
     module.workload_eks_security_group.id
   ]
+
 
   # -----------------------------------------------------------
   # MANAGED NODE GROUP
@@ -72,31 +80,34 @@ module "workload_eks" {
       ami_type = "AL2023_x86_64_STANDARD"
 
       instance_types = [
-        "t3.xlarge"
+        "t3.large"
       ]
 
       min_size     = 2
-      desired_size = 3
+      desired_size = 2
       max_size     = 4
     }
   }
+
 
   # -----------------------------------------------------------
   # EKS ACCESS ENTRIES
   # -----------------------------------------------------------
 
   access_entries = {
+
     # ---------------------------------------------------------
-    # ArgoCD running in the MANAGEMENT cluster.
+    # ARGO CD
     #
-    # Allows ArgoCD to authenticate to the workload cluster.
+    # This is the IAM role Argo CD uses when authenticating
+    # to the workload EKS cluster.
     # ---------------------------------------------------------
 
     argocd = {
       principal_arn = aws_iam_role.argocd_workload_eks_role.arn
 
       policy_associations = {
-        argocd = {
+        argocd_admin = {
           policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
           access_scope = {
@@ -104,12 +115,21 @@ module "workload_eks" {
           }
         }
       }
-    },
+    }
+
+
+    # ---------------------------------------------------------
+    # ADMIN EC2
+    #
+    # Commands executed through the private admin instance use
+    # the EC2 instance IAM role.
+    # ---------------------------------------------------------
+
     logbeacon_admin = {
       principal_arn = aws_iam_role.logbeacon_admin_role.arn
 
       policy_associations = {
-        admin = {
+        cluster_admin = {
           policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
           access_scope = {
@@ -120,17 +140,23 @@ module "workload_eks" {
     }
   }
 
-  tags = {
-    Environment = var.environment
-    Name        = "${var.project_name}-workload-cluster"
-    Cluster     = "workload"
-  }
+
+  # -----------------------------------------------------------
+  # TAGS
+  # -----------------------------------------------------------
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name    = "${var.project_name}-workload-cluster"
+      Cluster = "workload"
+    }
+  )
 }
 
 
 # =============================================================
-#                  MANAGEMENT EKS CLUSTER
-#                          PUBLIC
+#                   MANAGEMENT EKS CLUSTER
 # =============================================================
 
 module "management_eks" {
@@ -139,6 +165,7 @@ module "management_eks" {
 
   name               = "${var.project_name}-management-cluster"
   kubernetes_version = "1.33"
+
 
   # -----------------------------------------------------------
   # EKS ADDONS
@@ -158,18 +185,23 @@ module "management_eks" {
     }
   }
 
+
   # -----------------------------------------------------------
-  # EKS API
+  # EKS API ENDPOINT
   # -----------------------------------------------------------
 
-  # Public API is required for GitHub Actions bootstrap.
+  # GitHub Actions does not connect directly to the Kubernetes
+  # API in this architecture.
   #
-  # Private access is also enabled so resources inside the VPC
-  # can communicate with the API through the private endpoint.
-  endpoint_public_access  = true
+  # GitHub Actions -> SSM -> Admin EC2 -> Management EKS
+  #
+  # Therefore the management EKS API can also remain private.
+  endpoint_public_access  = false
   endpoint_private_access = true
 
-  enable_cluster_creator_admin_permissions = true
+  # Access is controlled explicitly through EKS access entries.
+  enable_cluster_creator_admin_permissions = false
+
 
   # -----------------------------------------------------------
   # NETWORKING
@@ -177,17 +209,16 @@ module "management_eks" {
 
   vpc_id = module.vpc.vpc_id
 
-  # Management nodes are placed in private subnets.
+  # Management worker nodes run in private subnets.
   subnet_ids = module.vpc.private_subnets
 
-  # Control-plane ENIs are placed in private subnets.
+  # EKS control-plane ENIs are attached to private subnets.
   control_plane_subnet_ids = module.vpc.private_subnets
 
-  # Keep the EKS-managed cluster security group and add our
-  # custom security group for additional network rules.
   additional_security_group_ids = [
     module.management_eks_security_group.id
   ]
+
 
   # -----------------------------------------------------------
   # MANAGED NODE GROUP
@@ -198,45 +229,35 @@ module "management_eks" {
       ami_type = "AL2023_x86_64_STANDARD"
 
       instance_types = [
-        "t3.large"
+        "t3.medium"
       ]
 
       min_size     = 2
       desired_size = 2
-      max_size     = 2
+      max_size     = 3
     }
   }
+
 
   # -----------------------------------------------------------
   # EKS ACCESS ENTRIES
   # -----------------------------------------------------------
 
   access_entries = {
+
     # ---------------------------------------------------------
-    # GitHub Actions infrastructure bootstrap.
+    # ADMIN EC2
     #
-    # Allows the infrastructure CI role to bootstrap and
-    # manage the management cluster.
+    # GitHub CI reaches this instance through SSM.
+    # Kubernetes commands executed on this instance use this
+    # IAM role.
     # ---------------------------------------------------------
 
-    infra_bootstrap_ci = {
-      principal_arn = module.logbeacon_infra_bootstrap_ci_role.arn
-
-      policy_associations = {
-        infra_bootstrap_ci = {
-          policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
-
-          access_scope = {
-            type = "cluster"
-          }
-        }
-      }
-    },
     logbeacon_admin = {
       principal_arn = aws_iam_role.logbeacon_admin_role.arn
 
       policy_associations = {
-        argocd = {
+        cluster_admin = {
           policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
 
           access_scope = {
@@ -247,9 +268,16 @@ module "management_eks" {
     }
   }
 
-  tags = {
-    Environment = var.environment
-    Name        = "${var.project_name}-management-cluster"
-    Cluster     = "management"
-  }
+
+  # -----------------------------------------------------------
+  # TAGS
+  # -----------------------------------------------------------
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name    = "${var.project_name}-management-cluster"
+      Cluster = "management"
+    }
+  )
 }

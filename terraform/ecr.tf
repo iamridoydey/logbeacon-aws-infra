@@ -1,21 +1,19 @@
-module "ecr_frontend" {
-  source = "terraform-aws-modules/ecr/aws"
+# =============================================================
+# ECR LIFECYCLE POLICY
+# =============================================================
 
-  repository_name = "${var.project_name}/frontend"
-
-  repository_type = "private"
-
-  repository_lifecycle_policy = jsonencode({
+locals {
+  ecr_lifecycle_policy = jsonencode({
     rules = [
       {
         rulePriority = 1
         description  = "Keep last 50 tagged images"
 
         selection = {
-          tagStatus   = "tagged"
+          tagStatus      = "tagged"
           tagPatternList = ["*"]
-          countType   = "imageCountMoreThan"
-          countNumber = 50
+          countType      = "imageCountMoreThan"
+          countNumber    = 50
         }
 
         action = {
@@ -39,13 +37,36 @@ module "ecr_frontend" {
       }
     ]
   })
-
-  tags = {
-    Name        = "${var.project_name}-frontend"
-    Environment = var.environment
-  }
 }
 
+
+# =============================================================
+# FRONTEND ECR REPOSITORY
+# =============================================================
+
+module "ecr_frontend" {
+  source = "terraform-aws-modules/ecr/aws"
+
+  repository_name = "${var.project_name}/frontend"
+  repository_type = "private"
+
+  repository_image_tag_mutability = "IMMUTABLE"
+  repository_image_scan_on_push   = true
+
+  repository_lifecycle_policy = local.ecr_lifecycle_policy
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${var.project_name}-frontend"
+    }
+  )
+}
+
+
+# =============================================================
+# BACKEND ECR REPOSITORY
+# =============================================================
 
 module "ecr_backend" {
   source = "terraform-aws-modules/ecr/aws"
@@ -53,43 +74,15 @@ module "ecr_backend" {
   repository_name = "${var.project_name}/backend"
   repository_type = "private"
 
-  repository_lifecycle_policy = jsonencode({
-    rules = [
-      {
-        rulePriority = 1
-        description  = "Keep last 50 tagged images"
+  repository_image_tag_mutability = "IMMUTABLE"
+  repository_image_scan_on_push   = true
 
-        selection = {
-          tagStatus   = "tagged"
-          tagPatternList = ["*"]
-          countType   = "imageCountMoreThan"
-          countNumber = 50
-        }
+  repository_lifecycle_policy = local.ecr_lifecycle_policy
 
-        action = {
-          type = "expire"
-        }
-      },
-      {
-        rulePriority = 2
-        description  = "Expire untagged images after 14 days"
-
-        selection = {
-          tagStatus   = "untagged"
-          countType   = "sinceImagePushed"
-          countNumber = 14
-          countUnit   = "days"
-        }
-
-        action = {
-          type = "expire"
-        }
-      }
-    ]
-  })
-
-  tags = {
-    Name        = "${var.project_name}-backend"
-    Environment = var.environment
-  }
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${var.project_name}-backend"
+    }
+  )
 }

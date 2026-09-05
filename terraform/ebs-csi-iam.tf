@@ -1,8 +1,13 @@
+# =============================================================
+# WORKLOAD EKS - EBS CSI POD IDENTITY
+# =============================================================
+
 module "ebs_csi_pod_identity" {
   source  = "terraform-aws-modules/eks-pod-identity/aws"
   version = "~> 1.0"
 
   name = "ebs-csi-pod-identity"
+
   attach_aws_ebs_csi_policy = true
 
   associations = {
@@ -13,8 +18,10 @@ module "ebs_csi_pod_identity" {
     }
   }
 
-  tags = {
-    Environment = var.environment
-    Name        = "ebs-csi-pod-identity"
-  }
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "ebs-csi-pod-identity"
+    }
+  )
 }

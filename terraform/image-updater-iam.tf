@@ -2,21 +2,20 @@
 #              ARGO IMAGE UPDATER IAM ROLE
 # =============================================================
 #
-# Argo Image Updater runs inside the MANAGEMENT EKS cluster.
+# Argo CD Image Updater runs inside the MANAGEMENT EKS cluster.
 #
-# Its job is to:
-#   1. Check ECR for new image versions/digests.
-#   2. Detect a new version.
-#   3. Update the image reference used by Argo CD.
-#   4. Optionally write the change back to Git.
+# Its AWS responsibility is only to:
+#   1. Authenticate to Amazon ECR.
+#   2. Inspect available image tags/digests.
+#   3. Detect new image versions.
 #
-# This IAM role is only for AWS/ECR access.
-# GitHub/Git credentials are handled separately.
+# Git write-back authentication is handled separately through
+# the GitHub credentials available to Argo CD Image Updater.
 # =============================================================
 
 resource "aws_iam_role" "argo_image_updater_role" {
+  name = "argo-image-updater-role"
 
-  name = "argo-image-updater-role-${var.environment}"
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
 
@@ -36,10 +35,12 @@ resource "aws_iam_role" "argo_image_updater_role" {
     ]
   })
 
-  tags = {
-    Name        = "argo-image-updater-role"
-    Environment = var.environment
-  }
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "argo-image-updater-role"
+    }
+  )
 }
 
 
@@ -47,12 +48,7 @@ resource "aws_iam_role" "argo_image_updater_role" {
 #              ECR READ-ONLY PERMISSION
 # =============================================================
 #
-# Image Updater only needs to inspect ECR.
-#
-# It needs to discover:
-#   - available image tags
-#   - image digests
-#   - image metadata
+# Image Updater only needs to inspect ECR repositories.
 #
 # It does NOT need permission to:
 #   - push images
@@ -67,21 +63,28 @@ resource "aws_iam_role_policy_attachment" "argo_image_updater_ecr" {
 
 
 # =============================================================
-#              EKS POD IDENTITY
+#              ARGO IMAGE UPDATER POD IDENTITY
 # =============================================================
 #
-# This connects the Kubernetes ServiceAccount used by
-# Argo Image Updater to the IAM role above.
+# Maps:
 #
-# Image Updater runs in the MANAGEMENT cluster because
-# Argo CD runs in the management cluster.
+# Management EKS
+#   argocd namespace
+#       argocd-image-updater ServiceAccount
+#                   |
+#                   v
+#       argo-image-updater-role
+#
+# The Pod Identity Agent supplies temporary AWS credentials
+# for this IAM role to the Image Updater pod.
 # =============================================================
 
 module "argo_image_updater_pod_identity" {
-
   source  = "terraform-aws-modules/eks-pod-identity/aws"
   version = "~> 1.0"
-  name    = "argo-image-updater-pod-identity"
+
+  name = "argo-image-updater-pod-identity"
+
   associations = {
     image_updater = {
       cluster_name    = module.management_eks.cluster_name
@@ -91,9 +94,10 @@ module "argo_image_updater_pod_identity" {
     }
   }
 
-  tags = {
-
-    Environment = var.environment
-    Name        = "argo-image-updater-pod-identity"
-  }
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "argo-image-updater-pod-identity"
+    }
+  )
 }
