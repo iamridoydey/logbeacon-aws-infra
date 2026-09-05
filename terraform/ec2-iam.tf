@@ -1,3 +1,6 @@
+# =============================================================
+#                  LOGBEACON ADMIN IAM ROLE
+# =============================================================
 
 resource "aws_iam_role" "logbeacon_admin_role" {
   name = "logbeacon-admin-role-${var.environment}"
@@ -13,10 +16,7 @@ resource "aws_iam_role" "logbeacon_admin_role" {
           Service = "ec2.amazonaws.com"
         }
 
-        Action = [
-          "sts:AssumeRole",
-          "sts:TagSession"
-        ]
+        Action = "sts:AssumeRole"
       }
     ]
   })
@@ -28,18 +28,19 @@ resource "aws_iam_role" "logbeacon_admin_role" {
 }
 
 
-# =========================================================================
-#   Allow logbeacon admin to access management and workload cluster
-# =========================================================================
+# =============================================================
+#      ALLOW ADMIN EC2 TO DESCRIBE BOTH EKS CLUSTERS
+# =============================================================
 
-resource "aws_iam_policy" "management_eks_access_policy" {
-  name = "management-eks-access-policy-${var.environment}"
+resource "aws_iam_policy" "logbeacon_admin_policy" {
+  name = "logbeacon-admin-policy-${var.environment}"
 
   policy = jsonencode({
     Version = "2012-10-17"
 
     Statement = [
       {
+        Sid    = "ManagementEksDescribeCluster"
         Effect = "Allow"
 
         Action = [
@@ -47,27 +48,10 @@ resource "aws_iam_policy" "management_eks_access_policy" {
         ]
 
         Resource = module.management_eks.cluster_arn
-      }
-    ]
-  })
-}
+      },
 
-
-resource "aws_iam_role_policy_attachment" "management_eks_attachment" {
-  role       = aws_iam_role.logbeacon_admin_role.name
-  policy_arn = aws_iam_policy.management_eks_access_policy.arn
-}
-
-
-
-resource "aws_iam_policy" "workload_eks_access_policy" {
-  name = "workload-eks-access-policy-${var.environment}"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-
-    Statement = [
       {
+        Sid    = "WorkloadEksDescribeCluster"
         Effect = "Allow"
 
         Action = [
@@ -81,24 +65,31 @@ resource "aws_iam_policy" "workload_eks_access_policy" {
 }
 
 
-resource "aws_iam_role_policy_attachment" "workload_eks_attachment" {
+# =============================================================
+#              ATTACH EKS POLICY TO ADMIN ROLE
+# =============================================================
+
+resource "aws_iam_role_policy_attachment" "logbeacon_admin_eks" {
   role       = aws_iam_role.logbeacon_admin_role.name
-  policy_arn = aws_iam_policy.workload_eks_access_policy.arn
+  policy_arn = aws_iam_policy.logbeacon_admin_policy.arn
 }
 
 
-# Session management policy attachment
+# =============================================================
+#              SSM MANAGED INSTANCE ACCESS
+# =============================================================
+
 resource "aws_iam_role_policy_attachment" "logbeacon_admin_ssm" {
   role       = aws_iam_role.logbeacon_admin_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 
-# ==========================================================
-#         Iam instance profile
-# ==========================================================
+# =============================================================
+#                    IAM INSTANCE PROFILE
+# =============================================================
+
 resource "aws_iam_instance_profile" "logbeacon_admin" {
   name = "logbeacon-admin-${var.environment}"
-
   role = aws_iam_role.logbeacon_admin_role.name
 }
