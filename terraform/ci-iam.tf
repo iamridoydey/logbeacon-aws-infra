@@ -6,10 +6,10 @@ module "iam_oidc_provider" {
 
   url = "https://token.actions.githubusercontent.com"
 
-  tags = {
+  tags = merge(
+    {
     Name        = "github-oidc-provider"
-    Environment = var.environment
-  }
+  })
 }
 # =============================================================
 # logbeacon-app repo ci role
