@@ -17,7 +17,6 @@
 resource "aws_iam_role" "argo_image_updater_role" {
 
   name = "argo-image-updater-role-${var.environment}"
-
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
 
@@ -62,9 +61,7 @@ resource "aws_iam_role" "argo_image_updater_role" {
 # =============================================================
 
 resource "aws_iam_role_policy_attachment" "argo_image_updater_ecr" {
-
   role       = aws_iam_role.argo_image_updater_role.name
-
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
@@ -84,27 +81,19 @@ module "argo_image_updater_pod_identity" {
 
   source  = "terraform-aws-modules/eks-pod-identity/aws"
   version = "~> 1.0"
-
-  name = "argo-image-updater-pod-identity"
-
+  name    = "argo-image-updater-pod-identity"
   associations = {
-
     image_updater = {
-
-      cluster_name = module.management_eks.cluster_name
-
-      namespace = "argocd"
-
+      cluster_name    = module.management_eks.cluster_name
+      namespace       = "argocd"
       service_account = "argocd-image-updater"
-
-      role_arn = aws_iam_role.argo_image_updater_role.arn
+      role_arn        = aws_iam_role.argo_image_updater_role.arn
     }
   }
 
   tags = {
 
     Environment = var.environment
-
-    Name = "argo-image-updater-pod-identity"
+    Name        = "argo-image-updater-pod-identity"
   }
 }
