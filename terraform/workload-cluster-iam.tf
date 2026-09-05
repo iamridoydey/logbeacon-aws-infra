@@ -55,7 +55,7 @@ module "logbeacon_app_ecr_pod_identity" {
     logbeacon_app = {
       cluster_name    = module.workload_eks.cluster_name
       namespace       = "logbeacon"
-      service_account = "logbeacon-app"
+      service_account = "logbeacon"
       role_arn        = aws_iam_role.logbeacon_app_ecr_role.arn
     }
   }
