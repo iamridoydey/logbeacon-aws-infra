@@ -164,7 +164,7 @@ resource "aws_secretsmanager_secret" "workload_eks_cred" {
   description = "LogBeacon workload eks credentials."
 
   tags = {
-    Name        = "logbeacon-cloudflare"
+    Name        = "workload-eks-cred"
     Environment = var.environment
   }
 
