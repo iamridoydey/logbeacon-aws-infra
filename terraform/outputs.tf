@@ -62,3 +62,9 @@ output "workload_cluster_certificate_authority_data" {
   value       = module.workload_eks.cluster_certificate_authority_data
   sensitive   = true
 }
+
+
+output "logbeacon_admin_ec2_id" {
+  description = "Logbeacon admin ec2 id"
+  value = aws_instance.logbeacon_admin.id
+}

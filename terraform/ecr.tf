@@ -53,6 +53,8 @@ module "ecr_frontend" {
   repository_image_tag_mutability = "IMMUTABLE"
   repository_image_scan_on_push   = true
 
+  repository_force_delete = true
+
   repository_lifecycle_policy = local.ecr_lifecycle_policy
 
   tags = merge(
@@ -76,6 +78,7 @@ module "ecr_backend" {
 
   repository_image_tag_mutability = "IMMUTABLE"
   repository_image_scan_on_push   = true
+  repository_force_delete = true
 
   repository_lifecycle_policy = local.ecr_lifecycle_policy
 
