@@ -157,39 +157,26 @@ resource "aws_iam_role_policy_attachment" "argocd_assume_workload_attachment" {
 #       MANAGEMENT EKS -> ARGO CD POD IDENTITIES
 # =============================================================
 
-module "argocd_management_pod_identity" {
-  source  = "terraform-aws-modules/eks-pod-identity/aws"
-  version = "~> 1.0"
-
-  name = "argocd-management-pod-identity"
-
-  associations = {
-    application_controller = {
-      cluster_name    = module.management_eks.cluster_name
-      namespace       = "argocd"
-      service_account = "argocd-application-controller"
-      role_arn        = aws_iam_role.argocd_management_role.arn
-    }
-
-    applicationset_controller = {
-      cluster_name    = module.management_eks.cluster_name
-      namespace       = "argocd"
-      service_account = "argocd-applicationset-controller"
-      role_arn        = aws_iam_role.argocd_management_role.arn
-    }
-
-    server = {
-      cluster_name    = module.management_eks.cluster_name
-      namespace       = "argocd"
-      service_account = "argocd-server"
-      role_arn        = aws_iam_role.argocd_management_role.arn
-    }
+locals {
+  argocd_management_pod_identity_associations = {
+    application_controller = "argocd-application-controller"
+    applicationset_controller = "argocd-applicationset-controller"
+    server = "argocd-server"
   }
+}
+
+resource "aws_eks_pod_identity_association" "argocd_management" {
+  for_each = local.argocd_management_pod_identity_associations
+
+  cluster_name    = module.management_eks.cluster_name
+  namespace       = "argocd"
+  service_account = each.value
+  role_arn        = aws_iam_role.argocd_management_role.arn
 
   tags = merge(
     local.common_tags,
     {
-      Name = "argocd-management-pod-identity"
+      Name = "argocd-management-pod-identity-${each.key}"
     }
   )
 }

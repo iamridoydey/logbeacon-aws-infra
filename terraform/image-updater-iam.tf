@@ -79,20 +79,11 @@ resource "aws_iam_role_policy_attachment" "argo_image_updater_ecr" {
 # for this IAM role to the Image Updater pod.
 # =============================================================
 
-module "argo_image_updater_pod_identity" {
-  source  = "terraform-aws-modules/eks-pod-identity/aws"
-  version = "~> 1.0"
-
-  name = "argo-image-updater-pod-identity"
-
-  associations = {
-    image_updater = {
-      cluster_name    = module.management_eks.cluster_name
-      namespace       = "argocd"
-      service_account = "argocd-image-updater"
-      role_arn        = aws_iam_role.argo_image_updater_role.arn
-    }
-  }
+resource "aws_eks_pod_identity_association" "argo_image_updater" {
+  cluster_name    = module.management_eks.cluster_name
+  namespace       = "argocd"
+  service_account = "argocd-image-updater"
+  role_arn        = aws_iam_role.argo_image_updater_role.arn
 
   tags = merge(
     local.common_tags,
