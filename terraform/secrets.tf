@@ -134,6 +134,38 @@ resource "aws_secretsmanager_secret_version" "logbeacon_cloudflare" {
 }
 
 
+
+# =============================================================
+# LOGBEACON SONARQUBE MONITORING PASSCODE
+# =============================================================
+
+resource "aws_secretsmanager_secret" "logbeacon_sonarqube_passcode" {
+  name        = "logbeacon/sonarqube-passcode"
+  description = "LogBeacon sonarqube monitoring passcode."
+
+  recovery_window_in_days = 0
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "logbeacon-sonarqube-passcode"
+    }
+  )
+
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
+}
+
+
+resource "aws_secretsmanager_secret_version" "logbeacon_sonarqube_passcode" {
+  secret_id = aws_secretsmanager_secret.logbeacon_sonarqube_passcode.id
+
+  secret_string = jsonencode({
+    MONITORING_PASSCODE = var.sonarqube_monitoring_passcode
+  })
+}
+
 # =============================================================
 # GITHUB SECRET
 # =============================================================
