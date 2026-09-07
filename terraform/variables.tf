@@ -101,6 +101,12 @@ variable "cloudflare_secrets" {
 }
 
 
+variable "sonarqube_monitoring_passcode" {
+  type = string
+  sensitive = true
+}
+
+
 variable "github_secrets" {
   type = object({
     username = string
