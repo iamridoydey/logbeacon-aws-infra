@@ -75,9 +75,9 @@ variable "logbeacon_secrets" {
     groq_api_key                   = string
 
     # Email
-    smtp_user                      = string
-    smtp_password                  = string
-    from_email                     = string
+    smtp_user     = string
+    smtp_password = string
+    from_email    = string
 
     # Frontend
     session_secret = string
@@ -102,7 +102,7 @@ variable "cloudflare_secrets" {
 
 
 variable "sonarqube_monitoring_passcode" {
-  type = string
+  type      = string
   sensitive = true
 }
 
@@ -110,7 +110,7 @@ variable "sonarqube_monitoring_passcode" {
 variable "github_secrets" {
   type = object({
     username = string
-    token = string
+    token    = string
   })
   sensitive = true
 }
@@ -118,6 +118,6 @@ variable "github_secrets" {
 
 variable "sonarqube_admin_password" {
   description = "Sonarqube admin password"
-  type = string
-  sensitive = true
+  type        = string
+  sensitive   = true
 }
