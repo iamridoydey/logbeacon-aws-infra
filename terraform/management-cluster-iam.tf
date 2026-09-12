@@ -159,9 +159,9 @@ resource "aws_iam_role_policy_attachment" "argocd_assume_workload_attachment" {
 
 locals {
   argocd_management_pod_identity_associations = {
-    application_controller = "argocd-application-controller"
+    application_controller    = "argocd-application-controller"
     applicationset_controller = "argocd-applicationset-controller"
-    server = "argocd-server"
+    server                    = "argocd-server"
   }
 }
 
