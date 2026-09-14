@@ -45,7 +45,8 @@ locals {
 # =============================================================
 
 module "ecr_frontend" {
-  source = "terraform-aws-modules/ecr/aws"
+  source  = "terraform-aws-modules/ecr/aws"
+  version = "3.2.0"
 
   repository_name = "${var.project_name}/frontend"
   repository_type = "private"
@@ -71,7 +72,8 @@ module "ecr_frontend" {
 # =============================================================
 
 module "ecr_backend" {
-  source = "terraform-aws-modules/ecr/aws"
+  source  = "terraform-aws-modules/ecr/aws"
+  version = "3.2.0"
 
   repository_name = "${var.project_name}/backend"
   repository_type = "private"

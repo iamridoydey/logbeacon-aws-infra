@@ -3,7 +3,8 @@
 # =============================================================
 
 module "iam_oidc_provider" {
-  source = "terraform-aws-modules/iam/aws//modules/iam-oidc-provider"
+  source  = "terraform-aws-modules/iam/aws//modules/iam-oidc-provider"
+  version = "6.8.1"
 
   url = "https://token.actions.githubusercontent.com"
 
@@ -21,7 +22,8 @@ module "iam_oidc_provider" {
 # =============================================================
 
 module "logbeacon_app_ci_role" {
-  source = "terraform-aws-modules/iam/aws//modules/iam-role"
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role"
+  version = "6.8.1"
 
   name = "logbeacon-app-ci-role"
 
@@ -50,7 +52,8 @@ module "logbeacon_app_ci_role" {
 # =============================================================
 
 module "logbeacon_infra_bootstrap_ci_role" {
-  source = "terraform-aws-modules/iam/aws//modules/iam-role"
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role"
+  version = "6.8.1"
 
   name = "logbeacon-infra-bootstrap-ci-role"
 
