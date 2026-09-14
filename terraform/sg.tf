@@ -98,10 +98,10 @@ resource "aws_security_group" "logbeacon_admin" {
   # ingress = []
 
   egress {
-    description = "Allow all outbound traffic"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    description = "Allow HTTPS outbound traffic"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "443"
     cidr_blocks = ["0.0.0.0/0"]
   }
 

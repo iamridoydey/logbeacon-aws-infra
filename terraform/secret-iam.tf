@@ -86,6 +86,11 @@ resource "aws_iam_role_policy_attachment" "logbeacon_secret_attachment" {
 }
 
 
+resource "aws_iam_role_policy_attachment" "workload_secrets_kms_decrypt" {
+  role       = aws_iam_role.workload_secrets_role.name
+  policy_arn = aws_iam_policy.secret_kms_decrypt.arn
+}
+
 # =============================================================
 #       WORKLOAD CLUSTER - EXTERNAL SECRETS POD IDENTITY
 # =============================================================
@@ -205,6 +210,11 @@ resource "aws_iam_role_policy_attachment" "sonarqube_bootstrap_attachment" {
   policy_arn = aws_iam_policy.sonarqube_bootstrap_policy.arn
 }
 
+
+resource "aws_iam_role_policy_attachment" "sonarqube_bootstrap_kms" {
+  role       = aws_iam_role.sonarqube_bootstrap_role.name
+  policy_arn = aws_iam_policy.secret_kms_read_write.arn
+}
 
 # =============================================================
 #       SONARQUBE BOOTSTRAP POD IDENTITY
@@ -375,6 +385,12 @@ resource "aws_iam_role_policy_attachment" "workload_eks_cred_read_attachment" {
   role       = aws_iam_role.management_secrets_role.name
   policy_arn = aws_iam_policy.workload_eks_cred_read_policy.arn
 }
+
+resource "aws_iam_role_policy_attachment" "management_secrets_kms_decrypt" {
+  role       = aws_iam_role.management_secrets_role.name
+  policy_arn = aws_iam_policy.management_secret_policy.arn
+}
+
 
 
 # =============================================================
