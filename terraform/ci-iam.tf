@@ -100,7 +100,7 @@ resource "aws_iam_policy" "infra_ci_ssm_access" {
           "ssm:GetCommandInvocation"
         ]
 
-        Resource = "*"
+        Resource = aws_instance.logbeacon_admin.arn
       }
     ]
   })

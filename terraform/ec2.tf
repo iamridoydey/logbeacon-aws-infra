@@ -41,6 +41,8 @@ resource "aws_instance" "logbeacon_admin" {
 
   iam_instance_profile = aws_iam_instance_profile.logbeacon_admin.name
 
+  ebs_optimized = true
+
   metadata_options {
     http_endpoint = "enabled"
     http_tokens   = "required"

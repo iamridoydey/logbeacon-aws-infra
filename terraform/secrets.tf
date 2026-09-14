@@ -5,6 +5,7 @@
 resource "aws_secretsmanager_secret" "logbeacon_app" {
   name        = "logbeacon/app"
   description = "LogBeacon application credentials."
+  kms_key_id = aws_kms_key.logbeacon_kms_key.id
 
   recovery_window_in_days = 0
 
@@ -39,6 +40,7 @@ resource "aws_secretsmanager_secret_version" "logbeacon_app" {
 resource "aws_secretsmanager_secret" "logbeacon_database" {
   name        = "logbeacon/database"
   description = "LogBeacon PostgreSQL credentials."
+  kms_key_id = aws_kms_key.logbeacon_kms_key.id
 
   recovery_window_in_days = 0
 
@@ -73,6 +75,7 @@ resource "aws_secretsmanager_secret_version" "logbeacon_database" {
 resource "aws_secretsmanager_secret" "logbeacon_smtp" {
   name        = "logbeacon/smtp"
   description = "LogBeacon SMTP credentials."
+  kms_key_id = aws_kms_key.logbeacon_kms_key.id
 
   recovery_window_in_days = 0
 
@@ -107,6 +110,7 @@ resource "aws_secretsmanager_secret_version" "logbeacon_smtp" {
 resource "aws_secretsmanager_secret" "logbeacon_cloudflare" {
   name        = "logbeacon/cloudflare"
   description = "LogBeacon Cloudflare credentials."
+  kms_key_id = aws_kms_key.logbeacon_kms_key.id
 
   recovery_window_in_days = 0
 
@@ -142,6 +146,7 @@ resource "aws_secretsmanager_secret_version" "logbeacon_cloudflare" {
 resource "aws_secretsmanager_secret" "logbeacon_sonarqube_passcode" {
   name        = "logbeacon/sonarqube-passcode"
   description = "LogBeacon sonarqube monitoring passcode."
+  kms_key_id = aws_kms_key.logbeacon_kms_key.id
 
   recovery_window_in_days = 0
 
@@ -173,6 +178,7 @@ resource "aws_secretsmanager_secret_version" "logbeacon_sonarqube_passcode" {
 resource "aws_secretsmanager_secret" "github_secret" {
   name        = "github-secret"
   description = "GitHub credentials used by Argo CD components."
+  kms_key_id = aws_kms_key.logbeacon_kms_key.id
 
   recovery_window_in_days = 0
 
@@ -211,6 +217,7 @@ resource "aws_secretsmanager_secret_version" "github_secret" {
 resource "aws_secretsmanager_secret" "workload_eks_cred" {
   name        = "workload-eks-cred"
   description = "Workload EKS connection information for Argo CD."
+  kms_key_id = aws_kms_key.logbeacon_kms_key.id
 
   recovery_window_in_days = 0
 
@@ -247,6 +254,7 @@ resource "aws_secretsmanager_secret_version" "workload_eks_cred" {
 resource "aws_secretsmanager_secret" "sonarqube_admin_password" {
   name        = "sonarqube-admin-password"
   description = "SonarQube administrator password."
+  kms_key_id = aws_kms_key.logbeacon_kms_key.id
 
   recovery_window_in_days = 0
 
@@ -287,6 +295,7 @@ resource "aws_secretsmanager_secret_version" "sonarqube_admin_password" {
 resource "aws_secretsmanager_secret" "sonarqube_ci_cred" {
   name        = "sonarqube-ci-cred"
   description = "SonarQube CI credentials."
+  kms_key_id = aws_kms_key.logbeacon_kms_key.id
 
   recovery_window_in_days = 0
 
