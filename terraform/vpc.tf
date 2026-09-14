@@ -4,6 +4,7 @@
 
 module "vpc" {
   source = "terraform-aws-modules/vpc/aws"
+  version = "6.7.2"
 
   name = "logbeacon-vpc"
   cidr = var.vpc_cidr

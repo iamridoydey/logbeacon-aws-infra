@@ -12,6 +12,7 @@
 
 module "management_eks_security_group" {
   source = "terraform-aws-modules/security-group/aws"
+  version = "6.0.0"
 
   name        = "${var.project_name}-management-eks"
   description = "Security group for LogBeacon management EKS cluster"
@@ -53,6 +54,7 @@ module "management_eks_security_group" {
 
 module "workload_eks_security_group" {
   source = "terraform-aws-modules/security-group/aws"
+  version = "6.0.0"
 
   name        = "${var.project_name}-workload-eks"
   description = "Security group for LogBeacon workload EKS cluster"
