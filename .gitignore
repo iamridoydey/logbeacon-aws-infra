@@ -1,6 +1,7 @@
-terraform/.terraform 
-terraform/.terraform.lock.hcl
-terraform/terraform.tfvars
-terraform/.env
+terraform/*/.terraform 
+terraform/*/.terraform.lock.hcl
+terraform/*/terraform.tfvars
+terraform/*/.env
 
 ansible/inventory.ini
+.ansible

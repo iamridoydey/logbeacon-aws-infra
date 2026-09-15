@@ -35,7 +35,7 @@ module "logbeacon_app_ci_role" {
 
   policies = {
     EcrReadWrite      = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
-    SonarqubeCredRead = aws_iam_policy.sonarqube_cred_read.arn
+    SonarqubeCredRead = aws_iam_policy.sonarqube_cred_read_policy.arn
   }
 
   tags = merge(
@@ -48,7 +48,7 @@ module "logbeacon_app_ci_role" {
 
 
 # =============================================================
-# LOGBEACON INFRA REPO CI ROLE
+# LOGBEACON INFRA REPO CI ROLES
 # =============================================================
 
 module "logbeacon_infra_bootstrap_pr_role" {
@@ -104,8 +104,9 @@ module "logbeacon_infra_bootstrap_ci_role" {
 
 
 # =============================================================
-# INFRA CI - S3 ACCESS POLICY
+# INFRA CI - TERRAFORM STATE S3 ACCESS POLICY
 # =============================================================
+
 resource "aws_iam_policy" "terraform_state_access" {
   name = "logbeacon-terraform-state-access"
 
@@ -140,9 +141,80 @@ resource "aws_iam_policy" "terraform_state_access" {
   )
 }
 
+
 # =============================================================
-# INFRA CI - SSM ACCESS POLICY
+# WORKLOAD EKS CREDENTIAL READ POLICY
 # =============================================================
+
+resource "aws_iam_policy" "workload_eks_cred_read_policy" {
+  name = "workload-eks-cred-read-policy"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Sid    = "ReadWorkloadEksCredentials"
+        Effect = "Allow"
+
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+
+        Resource = "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:workload-eks-cred*"
+      }
+    ]
+  })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "workload-eks-cred-read-policy"
+    }
+  )
+}
+
+
+# =============================================================
+# SONARQUBE CI CREDENTIAL READ POLICY
+# =============================================================
+
+resource "aws_iam_policy" "sonarqube_cred_read_policy" {
+  name = "sonarqube-cred-read-policy"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Sid    = "ReadSonarqubeCiCredentials"
+        Effect = "Allow"
+
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+
+        Resource = "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:sonarqube-ci-cred*"
+      }
+    ]
+  })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "sonarqube-cred-read-policy"
+    }
+  )
+}
+
+
+# =============================================================
+# INFRA CI - SSM ACCESS POLICY (ADMIN HOST)
+# =============================================================
+# NOTE: requires aws_instance.logbeacon_admin (in main-infra/ec2.tf)
+# to carry the tag Role = "logbeacon-admin" — confirm this before
+# relying on this policy.
 
 resource "aws_iam_policy" "infra_ci_ssm_access" {
   name = "infra-ci-ssm-access"
@@ -162,7 +234,13 @@ resource "aws_iam_policy" "infra_ci_ssm_access" {
           "ssm:GetCommandInvocation"
         ]
 
-        Resource = aws_instance.logbeacon_admin.arn
+        Resource = "*"
+
+        Condition = {
+          StringEquals = {
+            "aws:ResourceTag/Role" = "logbeacon-admin"
+          }
+        }
       }
     ]
   })
@@ -179,6 +257,9 @@ resource "aws_iam_policy" "infra_ci_ssm_access" {
 # =============================================================
 # ANSIBLE SSM S3 TRANSFER POLICY
 # =============================================================
+# NOTE: bucket name below must exactly match the `bucket = "..."`
+# value on aws_s3_bucket.ansible_ssm_transfer in main-infra —
+# confirm and correct if it differs.
 
 resource "aws_iam_policy" "ansible_ssm_transfer" {
   name = "logbeacon-ansible-ssm-s3-transfer"
@@ -200,8 +281,8 @@ resource "aws_iam_policy" "ansible_ssm_transfer" {
         ]
 
         Resource = [
-          aws_s3_bucket.ansible_ssm_transfer.arn,
-          "${aws_s3_bucket.ansible_ssm_transfer.arn}/*"
+          "arn:aws:s3:::logbeacon-ansible-ssm-transfer",
+          "arn:aws:s3:::logbeacon-ansible-ssm-transfer/*"
         ]
       }
     ]
