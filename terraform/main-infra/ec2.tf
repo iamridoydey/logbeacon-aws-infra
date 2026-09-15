@@ -56,7 +56,8 @@ resource "aws_instance" "logbeacon_admin" {
   tags = merge(
     local.common_tags,
     {
-      Name = "logbeacon-admin"
+      Name = "logbeacon-admin",
+      Role = "logbeacon-admin"
     }
   )
 }
