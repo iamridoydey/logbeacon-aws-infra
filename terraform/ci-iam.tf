@@ -51,6 +51,30 @@ module "logbeacon_app_ci_role" {
 # LOGBEACON INFRA REPO CI ROLE
 # =============================================================
 
+module "logbeacon_infra_bootstrap_pr_role" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role"
+  version = "6.8.1"
+
+  name = "logbeacon-infra-bootstrap-pr-role"
+
+  enable_github_oidc = true
+
+  oidc_wildcard_subjects = [
+    "repo:iamridoydey/logbeacon-aws-infra:pull_request"
+  ]
+
+  policies = {
+    TfStateAccess = aws_iam_policy.terraform_state_access.arn
+  }
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "logbeacon-infra-bootstrap-pr-role"
+    }
+  )
+}
+
 module "logbeacon_infra_bootstrap_ci_role" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role"
   version = "6.8.1"
@@ -64,6 +88,7 @@ module "logbeacon_infra_bootstrap_ci_role" {
   ]
 
   policies = {
+    TfStateAccess             = aws_iam_policy.terraform_state_access.arn
     WorkloadEksCredReadPolicy = aws_iam_policy.workload_eks_cred_read_policy.arn
     SsmAdminHostAccess        = aws_iam_policy.infra_ci_ssm_access.arn
     SsmAdminS3Access          = aws_iam_policy.ansible_ssm_transfer.arn
@@ -77,6 +102,43 @@ module "logbeacon_infra_bootstrap_ci_role" {
   )
 }
 
+
+# =============================================================
+# INFRA CI - S3 ACCESS POLICY
+# =============================================================
+resource "aws_iam_policy" "terraform_state_access" {
+  name = "logbeacon-terraform-state-access"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Sid    = "TerraformStateS3Access"
+        Effect = "Allow"
+
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+
+        Resource = [
+          "arn:aws:s3:::logbeacon-state-file",
+          "arn:aws:s3:::logbeacon-state-file/*"
+        ]
+      }
+    ]
+  })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "logbeacon-terraform-state-access"
+    }
+  )
+}
 
 # =============================================================
 # INFRA CI - SSM ACCESS POLICY
