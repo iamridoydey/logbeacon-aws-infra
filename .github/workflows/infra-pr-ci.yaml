@@ -119,7 +119,7 @@ jobs:
           sonarqube_monitoring_passcode = "${{ secrets.SONARQUBE_MONITORING_PASSCODE }}"
           EOF
 
-          mv terraform.tfvars terraform/
+          mv terraform.tfvars terraform/main-infra
 
       - name: Setup terraform
         uses: hashicorp/setup-terraform@v4
@@ -128,7 +128,7 @@ jobs:
 
       - name: Run terraform init and plan
         id: plan
-        working-directory: terraform
+        working-directory: terraform/main-infra
         run: |
           terraform init
           terraform plan --var-file="terraform.tfvars"
