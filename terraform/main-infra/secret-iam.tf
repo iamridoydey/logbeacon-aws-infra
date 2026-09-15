@@ -332,44 +332,6 @@ resource "aws_iam_policy" "management_secret_policy" {
 }
 
 
-# ===========================================================================
-# MANAGEMENT CLUSTER - WORKLOAD EKS CREDENTIAL READ POLICY
-#
-# This policy is intentionally separate because it is reused by:
-#
-#   1. Management External Secrets
-#   2. Infrastructure CI
-#
-# ===========================================================================
-resource "aws_iam_policy" "workload_eks_cred_read_policy" {
-  name = "workload-eks-cred-read-policy"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-
-    Statement = [
-      {
-        Sid    = "ReadWorkloadEksCredentials"
-        Effect = "Allow"
-
-        Action = [
-          "secretsmanager:GetSecretValue",
-          "secretsmanager:DescribeSecret"
-        ]
-
-        Resource = "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:workload-eks-cred*"
-      }
-    ]
-  })
-
-  tags = merge(
-    local.common_tags,
-    {
-      Name = "workload-eks-cred-read-policy"
-    }
-  )
-}
-
 
 # =============================================================
 #       MANAGEMENT CLUSTER - POLICY ATTACHMENTS
@@ -381,9 +343,10 @@ resource "aws_iam_role_policy_attachment" "management_secret_attachment" {
 }
 
 
+# Policy workload-eks-cred-read-policy is in bootstrap-infra
 resource "aws_iam_role_policy_attachment" "workload_eks_cred_read_attachment" {
   role       = aws_iam_role.management_secrets_role.name
-  policy_arn = aws_iam_policy.workload_eks_cred_read_policy.arn
+  policy_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/workload-eks-cred-read-policy"
 }
 
 resource "aws_iam_role_policy_attachment" "management_secrets_kms_decrypt" {
@@ -411,41 +374,3 @@ resource "aws_eks_pod_identity_association" "management_secrets" {
   )
 }
 
-
-# =============================================================
-#       LOGBEACON APP CI - SONARQUBE CREDENTIAL READ POLICY
-# =============================================================
-#
-# This policy is intentionally separate.
-#
-# The SonarQube bootstrap Job can READ/WRITE the CI token,
-# while the application CI can only READ it.
-# =============================================================
-
-resource "aws_iam_policy" "sonarqube_cred_read" {
-  name = "sonarqube-cred-read"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-
-    Statement = [
-      {
-        Sid    = "ReadSonarqubeCiCredentials"
-        Effect = "Allow"
-
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ]
-
-        Resource = aws_secretsmanager_secret.sonarqube_ci_cred.arn
-      }
-    ]
-  })
-
-  tags = merge(
-    local.common_tags,
-    {
-      Name = "sonarqube-cred-read"
-    }
-  )
-}
