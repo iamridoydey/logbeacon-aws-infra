@@ -1,4 +1,4 @@
-name: Infra ci pipeline
+name: Infra pull request ci pipeline
 
 on:
   pull_request:
@@ -25,7 +25,7 @@ jobs:
 
       - name: Terraform fmt
         id: fmt
-        working-directory: terraform
+        working-directory: terraform/main-infra
         run: terraform fmt -check -recursive
         continue-on-error: true
 
@@ -37,7 +37,7 @@ jobs:
           cache: true
 
       - name: Show version and initialize plugin
-        working-directory: terraform
+        working-directory: terraform/main-infra
         run: |
           tflint --version
           tflint --init
@@ -53,13 +53,13 @@ jobs:
       - name: Run Checkov Action
         uses: bridgecrewio/checkov-action@master
         with:
-          directory: "terraform"
+          directory: terraform/main-infra
           framework: terraform
           output_format: sarif
           output_file_path: results.sarif
 
       - name: Upload results to GitHub
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: success() || failure()
         with:
           sarif_file: results.sarif
@@ -127,6 +127,9 @@ jobs:
           terraform_version: "1.16.2"
 
       - name: Run terraform init and plan
+        env:
+          # Passing GITHUB_TOKEN prevents rate-limiting during plugin downloads
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         id: plan
         working-directory: terraform/main-infra
         run: |
