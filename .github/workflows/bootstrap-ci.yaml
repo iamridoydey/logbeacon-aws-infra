@@ -5,6 +5,8 @@ permissions:
   contents: read
   # Permission for requesting a short lived OIDC token
   id-token: write
+  # Provide access the CodeQL Action API endpoints
+  security-events: read
 
 jobs:
   # Infra validations
