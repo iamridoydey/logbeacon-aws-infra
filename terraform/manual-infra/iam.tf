@@ -38,7 +38,8 @@ resource "aws_iam_role" "bootstrap_infra_role" {
             "token.actions.githubusercontent.com:sub" = [
               # Repo that created before 19 aug need to attach account id with username and repo id with repo name
               "repo:${var.github_username}@${var.github_account_id}/logbeacon-aws-infra@${var.github_repo_id}:pull_request",
-              "repo:${var.github_username}@${var.github_account_id}/logbeacon-aws-infra@${var.github_repo_id}:ref:refs/heads/main"
+              "repo:${var.github_username}@${var.github_account_id}/logbeacon-aws-infra@${var.github_repo_id}:ref:refs/heads/main",
+              "repo:${var.github_username}@${var.github_account_id}/logbeacon-aws-infra@${var.github_repo_id}:environment:bootstrap-production"
             ]
           }
         }
@@ -86,6 +87,8 @@ resource "aws_iam_role_policy" "bootstrap_infra_policy" {
           "iam:PutRolePolicy",
           "iam:DeleteRolePolicy",
           "iam:GetRolePolicy",
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies",
           "iam:TagRole",
           "iam:TagPolicy",
           "iam:PassRole"
