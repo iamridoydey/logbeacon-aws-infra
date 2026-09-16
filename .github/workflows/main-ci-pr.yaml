@@ -1,15 +1,17 @@
-name: Infra pull request ci pipeline
-
+name: Main ci on pull request
 on:
-  workflow_run:
-    workflows: ["Bootstrap ci pipeline"]
-    types:
-      - completed
+  pull_request:
+    branches:
+      - main
+    paths:
+      - terraform/main-infra/**
 
 permissions:
   contents: read
   # Permission for requesting a short lived OIDC token
   id-token: write
+  # Provide access the CodeQL Action API endpoints
+  security-events: write
 
 jobs:
   # Infra validations
@@ -31,7 +33,7 @@ jobs:
         continue-on-error: true
 
       # Setup tflint and run it
-      - name: Setup tflint
+      - name: Setup TFLint
         uses: terraform-linters/setup-tflint@v6
         with:
           tflint_version: v0.52.0
@@ -47,7 +49,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run TFLint
-        working-directory: terraform
+        working-directory: terraform/main-infra
         run: tflint --recursive --format=compact
 
       # Setup Checkov and run test for security
