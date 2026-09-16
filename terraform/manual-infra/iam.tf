@@ -89,6 +89,8 @@ resource "aws_iam_role_policy" "bootstrap_infra_policy" {
           "iam:GetRolePolicy",
           "iam:ListRolePolicies",
           "iam:ListAttachedRolePolicies",
+          "iam:ListPolicyVersions",
+          "iam:ListInstanceProfilesForRole",
           "iam:TagRole",
           "iam:TagPolicy",
           "iam:PassRole"
