@@ -14,6 +14,12 @@ variable "environment" {
 }
 
 
+variable "github_username" {
+  description = "Github username"
+  type        = string
+}
+
+
 
 # ------------------------------------------
 #                   AWS
