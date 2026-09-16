@@ -1,0 +1,55 @@
+name: Bootstrap ci on destroy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # Required for GitHub OIDC
+  id-token: write
+
+jobs:
+  configure-aws-and-destroy-tf-resources:
+    name: Configure AWS and destroy bootstrap infra
+    runs-on: ubuntu-latest
+
+    steps:
+      # Authenticate to AWS through GitHub OIDC
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/bootstrap-infra-role
+
+      # Clone repository
+      - uses: actions/checkout@v7
+
+      # Generate required Terraform variables
+      - name: Generate terraform.tfvars
+        working-directory: terraform/bootstrap-infra
+        run: |
+          cat > terraform.tfvars <<EOF
+          environment       = "${{ vars.ENVIRONMENT }}"
+          github_username   = "${{ vars.GH_USERNAME }}"
+          EOF
+
+      # Install Terraform
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.16.2"
+
+      # Initialize backend
+      - name: Terraform Init
+        working-directory: terraform/bootstrap-infra
+        run: terraform init -input=false
+
+      # Destroy resources stored in bootstrap-infra state
+      - name: Terraform Destroy
+        id: destroy
+        working-directory: terraform/bootstrap-infra
+        run: |
+          terraform destroy \
+            -input=false \
+            -auto-approve \
+            -var-file="terraform.tfvars"
