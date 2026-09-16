@@ -17,3 +17,8 @@ variable "environment" {
   description = "Environment"
   type        = string
 }
+
+variable "github_username" {
+  description = "Github username"
+  type        = string
+}

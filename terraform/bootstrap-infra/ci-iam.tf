@@ -1,23 +1,4 @@
 # =============================================================
-# GITHUB OIDC PROVIDER
-# =============================================================
-
-module "iam_oidc_provider" {
-  source  = "terraform-aws-modules/iam/aws//modules/iam-oidc-provider"
-  version = "6.8.1"
-
-  url = "https://token.actions.githubusercontent.com"
-
-  tags = merge(
-    local.common_tags,
-    {
-      Name = "github-oidc-provider"
-    }
-  )
-}
-
-
-# =============================================================
 # LOGBEACON APP REPO CI ROLE
 # =============================================================
 
@@ -30,7 +11,7 @@ module "logbeacon_app_ci_role" {
   enable_github_oidc = true
 
   oidc_wildcard_subjects = [
-    "repo:iamridoydey/logbeacon-app:ref:refs/heads/main"
+    "repo:${var.github_username}/logbeacon-app:ref:refs/heads/main"
   ]
 
   policies = {
@@ -60,7 +41,7 @@ module "logbeacon_infra_bootstrap_pr_role" {
   enable_github_oidc = true
 
   oidc_wildcard_subjects = [
-    "repo:iamridoydey/logbeacon-aws-infra:pull_request"
+    "repo:${var.github_username}/logbeacon-aws-infra:pull_request"
   ]
 
   policies = {
@@ -84,7 +65,7 @@ module "logbeacon_infra_bootstrap_ci_role" {
   enable_github_oidc = true
 
   oidc_wildcard_subjects = [
-    "repo:iamridoydey/logbeacon-aws-infra:ref:refs/heads/main"
+    "repo:${var.github_username}/logbeacon-aws-infra:ref:refs/heads/main"
   ]
 
   policies = {
