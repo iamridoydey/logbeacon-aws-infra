@@ -35,8 +35,11 @@ resource "aws_iam_role" "bootstrap_infra_role" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:${var.github_username}/logbeacon-aws-infra:pull_request",
-            "token.actions.githubusercontent.com:sub" = "repo:${var.github_username}/logbeacon-aws-infra:ref:refs/heads/main"
+            "token.actions.githubusercontent.com:sub" = [
+              # Repo that created before 19 aug need to attach account id with username and repo id with repo name
+              "repo:${var.github_username}@${var.github_account_id}/logbeacon-aws-infra@${var.github_repo_id}:pull_request",
+              "repo:${var.github_username}@${var.github_account_id}/logbeacon-aws-infra@${var.github_repo_id}:ref:refs/heads/main"
+            ]
           }
         }
       }
@@ -89,6 +92,46 @@ resource "aws_iam_role_policy" "bootstrap_infra_policy" {
         ]
 
         Resource = "*"
+      },
+
+      {
+        Sid    = "AllowListTerraformStateBucket"
+        Effect = "Allow"
+
+        Action = [
+          "s3:ListBucket"
+        ]
+
+        Resource = var.s3_state_bucket_arn
+      },
+
+      {
+        Sid    = "AllowTerraformStateAccess"
+        Effect = "Allow"
+
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject"
+        ]
+
+        Resource = [
+          "${var.s3_state_bucket_arn}/bootstrap-infra.terraform.tfstate"
+        ]
+      },
+
+      {
+        Sid    = "AllowTerraformStateLockAccess"
+        Effect = "Allow"
+
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+
+        Resource = [
+          "${var.s3_state_bucket_arn}/bootstrap-infra.terraform.tfstate.tflock"
+        ]
       }
     ]
   })
