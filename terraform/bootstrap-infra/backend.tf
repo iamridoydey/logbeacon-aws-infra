@@ -13,6 +13,7 @@ terraform {
     }
   }
   
+  
   backend "s3" {
     bucket       = "logbeacon-state-file"
     key          = "bootstrap-infra.terraform.tfstate"
