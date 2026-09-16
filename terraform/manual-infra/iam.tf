@@ -35,6 +35,7 @@ resource "aws_iam_role" "bootstrap_infra_role" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
+            "token.actions.githubusercontent.com:sub" = "repo:${var.github_username}/logbeacon-aws-infra:pull_request",
             "token.actions.githubusercontent.com:sub" = "repo:${var.github_username}/logbeacon-aws-infra:ref:refs/heads/main"
           }
         }
