@@ -1,17 +1,17 @@
-name: Bootstrap ci pipeline
+name: Bootstrap ci on pull request
 on:
   pull_request:
     branches:
       - main
-    paths-ignore:
-      - terraform/manual-infra
+    paths:
+      - terraform/bootstrap-infra/**
 
 permissions:
   contents: read
   # Permission for requesting a short lived OIDC token
   id-token: write
   # Provide access the CodeQL Action API endpoints
-  security-events: read
+  security-events: write
 
 jobs:
   # Infra validations
@@ -66,7 +66,6 @@ jobs:
         if: success() || failure()
         with:
           sarif_file: results.sarif
-  
 
   configure-aws-and-run-tf:
     name: Configure aws and run tf
@@ -108,17 +107,3 @@ jobs:
       - run: echo "${{ steps.plan.outputs.stdout }}"
       - run: echo "${{ steps.plan.outputs.stderr }}"
       - run: echo "${{ steps.plan.outputs.exitcode }}"
-
-      - name: Run terraform apply
-        env:
-          # Passing GITHUB_TOKEN prevents rate-limiting during plugin downloads
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        id: apply
-        working-directory: terraform/bootstrap-infra
-        run: |
-          terraform apply -auto-approve --var-file="terraform.tfvars"
-
-      - run: echo "${{ steps.apply.outputs.stdout }}"
-      - run: echo "${{ steps.apply.outputs.stderr }}"
-      - run: echo "${{ steps.apply.outputs.exitcode }}"
-
