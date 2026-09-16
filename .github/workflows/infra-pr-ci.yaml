@@ -1,9 +1,10 @@
 name: Infra pull request ci pipeline
 
 on:
-  pull_request:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["Bootstrap ci pipeline"]
+    types:
+      - completed
 
 permissions:
   contents: read
