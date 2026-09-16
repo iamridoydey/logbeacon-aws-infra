@@ -41,6 +41,13 @@ resource "aws_iam_role" "bootstrap_infra_role" {
       }
     ]
   })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "bootstrap-infra-role"
+    }
+  )
 }
 
 
