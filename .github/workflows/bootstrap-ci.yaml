@@ -1,0 +1,120 @@
+name: Bootstrap ci pipeline
+on: workflow_dispatch
+
+permissions:
+  contents: read
+  # Permission for requesting a short lived OIDC token
+  id-token: write
+
+jobs:
+  # Infra validations
+  infra-validations:
+    name: Infra validations
+    runs-on: ubuntu-latest
+
+    steps:
+      # Clone git repo
+      - uses: actions/checkout@v7
+
+      # Setup terraform and format the file
+      - uses: hashicorp/setup-terraform@v4
+
+      - name: Terraform fmt
+        id: fmt
+        working-directory: terraform/bootstrap-infra
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      # Setup tflint and run it
+      - name: Setup tflint
+        uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.52.0
+          cache: true
+
+      - name: Show version and initialize plugin
+        working-directory: terraform/bootstrap-infra
+        run: |
+          tflint --version
+          tflint --init
+        env:
+          # Passing GITHUB_TOKEN prevents rate-limiting during plugin downloads
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run TFLint
+        working-directory: terraform/bootstrap-infra
+        run: tflint --recursive --format=compact
+
+      # Setup Checkov and run test for security
+      - name: Run Checkov Action
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform/bootstrap-infra
+          framework: terraform
+          output_format: sarif
+          output_file_path: results.sarif
+
+      - name: Upload results to GitHub
+        uses: github/codeql-action/upload-sarif@v4
+        if: success() || failure()
+        with:
+          sarif_file: results.sarif
+  
+
+  configure-aws-and-run-tf:
+    name: Configure aws and run tf
+    runs-on: ubuntu-latest
+    needs:
+      - infra-validations
+    
+    # Real human approval gate before plan/apply runs, not just implied
+    environment: bootstrap-production 
+
+    steps:
+      - name: Configure aws
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-region: "${{ vars.AWS_REGION }}"
+          role-to-assume: "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/bootstrap-infra-role"
+
+      # Clone git repo
+      - uses: actions/checkout@v7
+
+      # Generate terraform.tfvars
+      - name: Generate terraform.tfvars
+        run: |
+          cat > terraform.tfvars <<-EOF
+          environment = "${{ vars.ENVIRONMENT }}"
+          EOF
+
+          mv terraform.tfvars terraform/bootstrap-infra
+
+      - name: Setup terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.16.2"
+
+      - name: Run terraform init and plan
+        id: plan
+        working-directory: terraform/bootstrap-infra
+        run: |
+          terraform init
+          terraform plan --var-file="terraform.tfvars"
+
+      - run: echo "${{ steps.plan.outputs.stdout }}"
+      - run: echo "${{ steps.plan.outputs.stderr }}"
+      - run: echo "${{ steps.plan.outputs.exitcode }}"
+
+      - name: Run terraform apply
+        env:
+          # Passing GITHUB_TOKEN prevents rate-limiting during plugin downloads
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: apply
+        working-directory: terraform/bootstrap-infra
+        run: |
+          terraform apply -auto-approve --var-file="terraform.tfvars"
+
+      - run: echo "${{ steps.apply.outputs.stdout }}"
+      - run: echo "${{ steps.apply.outputs.stderr }}"
+      - run: echo "${{ steps.apply.outputs.exitcode }}"
+
