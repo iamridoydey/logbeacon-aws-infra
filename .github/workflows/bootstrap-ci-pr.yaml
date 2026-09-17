@@ -5,6 +5,7 @@ on:
       - main
     paths:
       - terraform/bootstrap-infra/**
+      - .github/workflows/bootstrap-ci-pr.yaml
 
 permissions:
   contents: read
@@ -89,6 +90,8 @@ jobs:
           cat > terraform.tfvars <<-EOF
           environment = "${{ vars.ENVIRONMENT }}"
           github_username = "${{ vars.GH_USERNAME }}"
+          github_account_id = "${{ vars.GH_ACCOUNT_ID }}"
+          github_repo_id = "${{ vars.GH_REPO_ID }}"
           EOF
 
           mv terraform.tfvars terraform/bootstrap-infra
