@@ -6,7 +6,8 @@ module "logbeacon_app_ci_role" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role"
   version = "6.8.1"
 
-  name = "logbeacon-app-ci-role"
+  name            = "logbeacon-app-ci-role"
+  use_name_prefix = false
 
   enable_github_oidc = true
 
@@ -36,7 +37,8 @@ module "logbeacon_infra_bootstrap_pr_role" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role"
   version = "6.8.1"
 
-  name = "logbeacon-infra-bootstrap-pr-role"
+  name            = "logbeacon-infra-bootstrap-pr-role"
+  use_name_prefix = false
 
   enable_github_oidc = true
 
@@ -60,7 +62,8 @@ module "logbeacon_infra_bootstrap_ci_role" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role"
   version = "6.8.1"
 
-  name = "logbeacon-infra-bootstrap-ci-role"
+  name            = "logbeacon-infra-bootstrap-ci-role"
+  use_name_prefix = false
 
   enable_github_oidc = true
 
