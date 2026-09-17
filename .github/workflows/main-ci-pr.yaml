@@ -5,6 +5,7 @@ on:
       - main
     paths:
       - terraform/main-infra/**
+      - .github/workflows/main-ci-pr.yaml
 
 permissions:
   contents: read
@@ -13,6 +14,9 @@ permissions:
   # Provide access the CodeQL Action API endpoints
   security-events: write
 
+concurrency:
+  group: main-infra
+  cancel-in-progress: false
 jobs:
   # Infra validations
   infra-validations:
@@ -120,6 +124,7 @@ jobs:
           sonarqube_admin_password = "${{ secrets.SONARQUBE_ADMIN_PASSWORD }}"
           environment = "${{ vars.ENVIRONMENT }}"
           sonarqube_monitoring_passcode = "${{ secrets.SONARQUBE_MONITORING_PASSCODE }}"
+          github_username = "${{ vars.GH_USERNAME }}"
           EOF
 
           mv terraform.tfvars terraform/main-infra
