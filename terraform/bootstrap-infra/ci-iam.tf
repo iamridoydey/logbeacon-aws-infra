@@ -228,7 +228,8 @@ resource "aws_iam_policy" "main_infra_apply" {
           "ssm:StartSession",
           "ssm:SendCommand",
           "ssm:DescribeInstanceInformation",
-          "ssm:GetCommandInvocation"
+          "ssm:GetCommandInvocation",
+          "ssm:ssm:GetParameter"
         ]
 
         Resource = "*"
