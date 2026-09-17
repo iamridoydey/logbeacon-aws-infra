@@ -22,3 +22,15 @@ variable "github_username" {
   description = "Github username"
   type        = string
 }
+
+
+variable "github_account_id" {
+  description = "Github account id"
+  type        = string
+}
+
+
+variable "github_repo_id" {
+  description = "Github repo id"
+  type        = string
+}
