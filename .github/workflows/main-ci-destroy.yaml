@@ -208,7 +208,6 @@ jobs:
           sonarqube_admin_password = "${SONARQUBE_ADMIN_PASSWORD}"
           environment = "${{ vars.ENVIRONMENT }}"
           sonarqube_monitoring_passcode = "${SONARQUBE_MONITORING_PASSCODE}"
-          github_username = "${{ vars.GH_USERNAME }}"
           EOF
 
       - name: Terraform destroy
