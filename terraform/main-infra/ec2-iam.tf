@@ -85,7 +85,7 @@ resource "aws_iam_role_policy_attachment" "logbeacon_admin_eks" {
 
 
 # =============================================================
-#              SSM MANAGED INSTANCE ACCESS
+# SSM AGENT ON EC2 NEED POLICY TO TALK WITH SSM SERVICE
 # =============================================================
 
 resource "aws_iam_role_policy_attachment" "logbeacon_admin_ssm" {

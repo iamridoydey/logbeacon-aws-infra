@@ -53,6 +53,9 @@ module "workload_eks" {
   # Explicit access entries are defined below.
   enable_cluster_creator_admin_permissions = false
 
+  # Turned of cloudwatch
+  create_cloudwatch_log_group = false
+
 
   # -----------------------------------------------------------
   # NETWORKING
@@ -201,6 +204,9 @@ module "management_eks" {
 
   # Access is controlled explicitly through EKS access entries.
   enable_cluster_creator_admin_permissions = false
+
+  # Turned of cloudwatch
+  create_cloudwatch_log_group = false
 
 
   # -----------------------------------------------------------
