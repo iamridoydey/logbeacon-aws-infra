@@ -124,7 +124,6 @@ jobs:
           sonarqube_admin_password = "${{ secrets.SONARQUBE_ADMIN_PASSWORD }}"
           environment = "${{ vars.ENVIRONMENT }}"
           sonarqube_monitoring_passcode = "${{ secrets.SONARQUBE_MONITORING_PASSCODE }}"
-          github_username = "${{ vars.GH_USERNAME }}"
           EOF
 
           mv terraform.tfvars terraform/main-infra
