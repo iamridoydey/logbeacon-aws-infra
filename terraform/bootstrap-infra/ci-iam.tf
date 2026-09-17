@@ -74,10 +74,14 @@ module "logbeacon_infra_bootstrap_ci_role" {
   ]
 
   policies = {
+<<<<<<< Updated upstream
     TfStateAccess             = aws_iam_policy.terraform_state_access.arn
     WorkloadEksCredReadPolicy = aws_iam_policy.workload_eks_cred_read_policy.arn
     SsmAdminHostAccess        = aws_iam_policy.infra_ci_ssm_access.arn
     SsmAdminS3Access          = aws_iam_policy.ansible_ssm_transfer.arn
+=======
+    MainInfraApply = aws_iam_policy.main_infra_apply.arn
+>>>>>>> Stashed changes
   }
 
   tags = merge(
@@ -91,6 +95,7 @@ module "logbeacon_infra_bootstrap_ci_role" {
 
 # =============================================================
 # INFRA CI - TERRAFORM STATE S3 ACCESS POLICY
+# Used only for pull request
 # =============================================================
 
 resource "aws_iam_policy" "terraform_state_access" {
@@ -106,8 +111,6 @@ resource "aws_iam_policy" "terraform_state_access" {
 
         Action = [
           "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
           "s3:ListBucket"
         ]
 
@@ -195,13 +198,8 @@ resource "aws_iam_policy" "sonarqube_cred_read_policy" {
 }
 
 
-# =============================================================
-# INFRA CI - SSM ACCESS POLICY (ADMIN HOST)
-# =============================================================
-# NOTE: requires aws_instance.logbeacon_admin (in main-infra/ec2.tf)
-# to carry the tag Role = "logbeacon-admin" — confirm this before
-# relying on this policy.
 
+<<<<<<< Updated upstream
 resource "aws_iam_policy" "infra_ci_ssm_access" {
   name = "infra-ci-ssm-access"
 
@@ -210,6 +208,32 @@ resource "aws_iam_policy" "infra_ci_ssm_access" {
 
     Statement = [
       {
+=======
+
+
+# =============================================================
+# Allow list of permission need for run tf plan on runner
+# =============================================================
+resource "aws_iam_policy" "main_infra_apply" {
+  name = "logbeacon-main-infra-apply"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "VpcEc2Networking"
+        Effect   = "Allow"
+        Action   = ["ec2:*"]
+        Resource = "*"
+      },
+      {
+        Sid      = "EksClustersAndIdentity"
+        Effect   = "Allow"
+        Action   = ["eks:*"]
+        Resource = "*"
+      },
+      {
+>>>>>>> Stashed changes
         Sid    = "ManageAdminHostThroughSsm"
         Effect = "Allow"
 
@@ -227,6 +251,7 @@ resource "aws_iam_policy" "infra_ci_ssm_access" {
             "aws:ResourceTag/Role" = "logbeacon-admin"
           }
         }
+<<<<<<< Updated upstream
       }
     ]
   })
@@ -280,4 +305,179 @@ resource "aws_iam_policy" "ansible_ssm_transfer" {
       Name = "logbeacon-ansible-ssm-s3-transfer"
     }
   )
+=======
+      },
+      {
+        Sid    = "IamForRolesAndProfiles"
+        Effect = "Allow"
+        Action = [
+          "iam:CreateRole",
+          "iam:GetRole",
+          "iam:GetRolePolicy",
+          "iam:UpdateRole",
+          "iam:UpdateAssumeRolePolicy",
+          "iam:DeleteRole",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:ListRolePolicies",
+          "iam:ListAttachedRolePolicies",
+          "iam:ListInstanceProfilesForRole",
+          "iam:CreatePolicy",
+          "iam:GetPolicy",
+          "iam:GetPolicyVersion",
+          "iam:ListPolicyVersions",
+          "iam:CreatePolicyVersion",
+          "iam:DeletePolicyVersion",
+          "iam:DeletePolicy",
+          "iam:TagPolicy",
+          "iam:UntagPolicy",
+          "iam:AttachRolePolicy",
+          "iam:DetachRolePolicy",
+          "iam:PutRolePolicy",
+          "iam:DeleteRolePolicy",
+          "iam:CreateInstanceProfile",
+          "iam:GetInstanceProfile",
+          "iam:DeleteInstanceProfile",
+          "iam:AddRoleToInstanceProfile",
+          "iam:RemoveRoleFromInstanceProfile",
+          "iam:TagInstanceProfile",
+          "iam:ListInstanceProfiles",
+          "iam:CreateOpenIDConnectProvider",
+          "iam:GetOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:TagOpenIDConnectProvider",
+          "iam:UpdateOpenIDConnectProviderThumbprint",
+          "iam:ListOpenIDConnectProviders",
+          "iam:ListRoles",
+          "iam:ListPolicies",
+          "iam:PassRole"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "KmsAdminNoDecrypt"
+        Effect = "Allow"
+        Action = [
+          "kms:CreateKey",
+          "kms:DescribeKey",
+          "kms:GetKeyPolicy",
+          "kms:GetKeyRotationStatus",
+          "kms:ListKeys",
+          "kms:ListAliases",
+          "kms:ListResourceTags",
+          "kms:CreateAlias",
+          "kms:DeleteAlias",
+          "kms:UpdateAlias",
+          "kms:EnableKeyRotation",
+          "kms:DisableKeyRotation",
+          "kms:PutKeyPolicy",
+          "kms:ScheduleKeyDeletion",
+          "kms:CancelKeyDeletion",
+          "kms:TagResource",
+          "kms:UntagResource",
+          "kms:CreateGrant",
+          "kms:ListGrants",
+          "kms:RevokeGrant"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "KmsDecryptThisAccountOnly"
+        Effect = "Allow"
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:GenerateDataKey"
+        ]
+        Resource = "arn:aws:kms:${var.default_region}:${data.aws_caller_identity.current.account_id}:key/*"
+      },
+      {
+        Sid    = "SecretsAdminNoGet"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:CreateSecret",
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:UpdateSecret",
+          "secretsmanager:DeleteSecret",
+          "secretsmanager:RestoreSecret",
+          "secretsmanager:TagResource",
+          "secretsmanager:UntagResource",
+          "secretsmanager:GetResourcePolicy",
+          "secretsmanager:PutResourcePolicy",
+          "secretsmanager:DeleteResourcePolicy",
+          "secretsmanager:ListSecrets"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "SecretsGetThisStackOnly"
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
+        Resource = [
+          "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:logbeacon-*",
+          "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:sonarqube-*",
+          "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:github_secret*",
+          "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:workload-eks-cred*"
+        ]
+      },
+      {
+        Sid    = "S3AdminNoGetObject"
+        Effect = "Allow"
+        Action = [
+          "s3:CreateBucket",
+          "s3:DeleteBucket",
+          "s3:ListBucket",
+          "s3:GetBucketLocation",
+          "s3:GetBucketAcl",
+          "s3:GetBucketPolicy",
+          "s3:PutBucketPolicy",
+          "s3:DeleteBucketPolicy",
+          "s3:GetBucketVersioning",
+          "s3:PutBucketVersioning",
+          "s3:GetBucketPublicAccessBlock",
+          "s3:PutBucketPublicAccessBlock",
+          "s3:GetEncryptionConfiguration",
+          "s3:PutEncryptionConfiguration",
+          "s3:GetLifecycleConfiguration",
+          "s3:PutLifecycleConfiguration",
+          "s3:GetBucketTagging",
+          "s3:PutBucketTagging",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "S3GetThisStackOnly"
+        Effect = "Allow"
+        Action = ["s3:GetObject"]
+        Resource = [
+          "arn:aws:s3:::logbeacon-state-file/*",
+          "arn:aws:s3:::logbeacon-ansible-ssm-transfer/*",
+          "arn:aws:s3:::logbeacon-log-bucket/*"
+        ]
+      },
+      {
+        Sid    = "EcrRepos"
+        Effect = "Allow"
+        Action = [
+          "ecr:CreateRepository",
+          "ecr:DescribeRepositories",
+          "ecr:DeleteRepository",
+          "ecr:PutLifecyclePolicy",
+          "ecr:GetLifecyclePolicy",
+          "ecr:DeleteLifecyclePolicy",
+          "ecr:SetRepositoryPolicy",
+          "ecr:GetRepositoryPolicy",
+          "ecr:DeleteRepositoryPolicy",
+          "ecr:ListTagsForResource",
+          "ecr:TagResource",
+          "ecr:UntagResource"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+>>>>>>> Stashed changes
 }
