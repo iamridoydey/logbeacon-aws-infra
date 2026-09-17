@@ -54,7 +54,7 @@ jobs:
         working-directory: ${{ env.TF_DIR }}
         env:
           LOGBEACON_SECRETS_HCL: ${{ secrets.LOGBEACON_SECRETS }}
-          GITHUB_SECRETS_HCL: ${{ secrets.GITHUB_SECRETS }}
+          GITHUB_SECRETS_HCL: ${{ secrets.GH_SECRETS }}
           CLOUDFLARE_SECRETS_HCL: ${{ secrets.CLOUDFLARE_SECRETS }}
           SONARQUBE_ADMIN_PASSWORD: ${{ secrets.SONARQUBE_ADMIN_PASSWORD }}
           SONARQUBE_MONITORING_PASSCODE: ${{ secrets.SONARQUBE_MONITORING_PASSCODE }}
