@@ -41,7 +41,7 @@ module "logbeacon_infra_bootstrap_pr_role" {
   enable_github_oidc = true
 
   oidc_wildcard_subjects = [
-    "repo:${var.github_username}/logbeacon-aws-infra:pull_request"
+    "repo:${var.github_username}@${var.github_account_id}/logbeacon-aws-infra@${var.github_repo_id}:pull_request"
   ]
 
   policies = {
