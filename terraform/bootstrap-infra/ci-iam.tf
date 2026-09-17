@@ -74,14 +74,7 @@ module "logbeacon_infra_bootstrap_ci_role" {
   ]
 
   policies = {
-<<<<<<< Updated upstream
-    TfStateAccess             = aws_iam_policy.terraform_state_access.arn
-    WorkloadEksCredReadPolicy = aws_iam_policy.workload_eks_cred_read_policy.arn
-    SsmAdminHostAccess        = aws_iam_policy.infra_ci_ssm_access.arn
-    SsmAdminS3Access          = aws_iam_policy.ansible_ssm_transfer.arn
-=======
     MainInfraApply = aws_iam_policy.main_infra_apply.arn
->>>>>>> Stashed changes
   }
 
   tags = merge(
@@ -198,19 +191,6 @@ resource "aws_iam_policy" "sonarqube_cred_read_policy" {
 }
 
 
-
-<<<<<<< Updated upstream
-resource "aws_iam_policy" "infra_ci_ssm_access" {
-  name = "infra-ci-ssm-access"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-
-    Statement = [
-      {
-=======
-
-
 # =============================================================
 # Allow list of permission need for run tf plan on runner
 # =============================================================
@@ -233,7 +213,6 @@ resource "aws_iam_policy" "main_infra_apply" {
         Resource = "*"
       },
       {
->>>>>>> Stashed changes
         Sid    = "ManageAdminHostThroughSsm"
         Effect = "Allow"
 
@@ -251,61 +230,6 @@ resource "aws_iam_policy" "main_infra_apply" {
             "aws:ResourceTag/Role" = "logbeacon-admin"
           }
         }
-<<<<<<< Updated upstream
-      }
-    ]
-  })
-
-  tags = merge(
-    local.common_tags,
-    {
-      Name = "infra-ci-ssm-access"
-    }
-  )
-}
-
-
-# =============================================================
-# ANSIBLE SSM S3 TRANSFER POLICY
-# =============================================================
-# NOTE: bucket name below must exactly match the `bucket = "..."`
-# value on aws_s3_bucket.ansible_ssm_transfer in main-infra —
-# confirm and correct if it differs.
-
-resource "aws_iam_policy" "ansible_ssm_transfer" {
-  name = "logbeacon-ansible-ssm-s3-transfer"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-
-    Statement = [
-      {
-        Sid    = "AnsibleSsmS3Transfer"
-        Effect = "Allow"
-
-        Action = [
-          "s3:PutObject",
-          "s3:GetObject",
-          "s3:DeleteObject",
-          "s3:ListBucket",
-          "s3:GetBucketLocation"
-        ]
-
-        Resource = [
-          "arn:aws:s3:::logbeacon-ansible-ssm-transfer",
-          "arn:aws:s3:::logbeacon-ansible-ssm-transfer/*"
-        ]
-      }
-    ]
-  })
-
-  tags = merge(
-    local.common_tags,
-    {
-      Name = "logbeacon-ansible-ssm-s3-transfer"
-    }
-  )
-=======
       },
       {
         Sid    = "IamForRolesAndProfiles"
@@ -479,5 +403,4 @@ resource "aws_iam_policy" "ansible_ssm_transfer" {
       }
     ]
   })
->>>>>>> Stashed changes
 }
