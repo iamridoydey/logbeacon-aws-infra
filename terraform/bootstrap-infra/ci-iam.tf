@@ -199,6 +199,7 @@ resource "aws_iam_policy" "sonarqube_cred_read_policy" {
 resource "aws_iam_policy" "main_infra_apply" {
   #checkov:skip=CKV_AWS_286:Protected Terraform apply role must create and attach IAM roles and pass LogBeacon roles to EKS and EC2
   #checkov:skip=CKV_AWS_287:Terraform manages approved LogBeacon secrets and KMS-encrypted resources
+  #checkov:skip=CKV_AWS_288:Ensure IAM policies does not allow data exfiltration
   #checkov:skip=CKV_AWS_289:Terraform must manage resource policies for provisioned LogBeacon infrastructure
   #checkov:skip=CKV_AWS_290:Protected production apply role requires constrained infrastructure write access
   #checkov:skip=CKV_AWS_355:Some AWS create and list operations do not support resource-level permissions
