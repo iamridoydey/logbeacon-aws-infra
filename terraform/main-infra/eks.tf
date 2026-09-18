@@ -56,6 +56,14 @@ module "workload_eks" {
   # Turned of cloudwatch
   create_cloudwatch_log_group = false
 
+  # Kms secret config
+  encryption_config = [
+    {
+      resources        = ["secrets"]
+      provider_key_arn = aws_kms_key.workload_cluster.arn
+    }
+  ]
+
 
   # -----------------------------------------------------------
   # NETWORKING
@@ -208,6 +216,13 @@ module "management_eks" {
   # Turned of cloudwatch
   create_cloudwatch_log_group = false
 
+  # Kms secret config
+  encryption_config = [
+    {
+      resources        = ["secrets"]
+      provider_key_arn = aws_kms_key.management_cluster.arn
+    }
+  ]
 
   # -----------------------------------------------------------
   # NETWORKING
