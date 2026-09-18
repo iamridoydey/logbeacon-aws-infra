@@ -349,7 +349,8 @@ resource "aws_iam_policy" "main_infra_apply" {
           "secretsmanager:GetResourcePolicy",
           "secretsmanager:PutResourcePolicy",
           "secretsmanager:DeleteResourcePolicy",
-          "secretsmanager:ListSecrets"
+          "secretsmanager:ListSecrets",
+          "secretsmanager:GetSecretValue"
         ]
         Resource = "*"
       },
@@ -386,6 +387,7 @@ resource "aws_iam_policy" "main_infra_apply" {
           "s3:PutLifecycleConfiguration",
           "s3:GetBucketTagging",
           "s3:PutBucketTagging",
+          "s3:GetBucketCors",
           "s3:PutObject",
           "s3:DeleteObject"
         ]
