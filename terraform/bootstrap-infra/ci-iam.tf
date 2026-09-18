@@ -251,17 +251,6 @@ resource "aws_iam_policy" "main_infra_apply" {
         Resource = "arn:aws:ssm:*::parameter/aws/service/eks/*"
       },
       {
-        Sid    = "SsmPublicEksAmiParameterRead"
-        Effect = "Allow"
-
-        Action = [
-          "ssm:GetParameter",
-          "ssm:GetParameters"
-        ]
-
-        Resource = "arn:aws:ssm:*::parameter/aws/service/eks/*"
-      },
-      {
         Sid    = "IamForRolesAndProfiles"
         Effect = "Allow"
         Action = [
