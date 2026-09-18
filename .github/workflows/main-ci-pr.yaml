@@ -114,19 +114,26 @@ jobs:
       # Clone git repo
       - uses: actions/checkout@v7
 
-      # Generate terraform.tfvars
+            # Generate terraform.tfvars
       - name: Generate terraform.tfvars
+        working-directory: terraform/main-infra
+        env:
+          LOGBEACON_SECRETS_HCL: ${{ secrets.LOGBEACON_SECRETS }}
+          GITHUB_SECRETS_HCL: ${{ secrets.GITHUB_SECRETS }}
+          CLOUDFLARE_SECRETS_HCL: ${{ secrets.CLOUDFLARE_SECRETS }}
+          SONARQUBE_ADMIN_PASSWORD: ${{ secrets.SONARQUBE_ADMIN_PASSWORD }}
+          SONARQUBE_MONITORING_PASSCODE: ${{ secrets.SONARQUBE_MONITORING_PASSCODE }}
         run: |
-          cat > terraform.tfvars <<-EOF
-          logbeacon_secrets = "${{ secrets.LOGBEACON_SECRETS }}"
-          github_secrets = "${{ secrets.GITHUB_SECRETS }}"
-          cloudflare_secrets = "${{ secrets.CLOUDFLARE_SECRETS }}"
-          sonarqube_admin_password = "${{ secrets.SONARQUBE_ADMIN_PASSWORD }}"
+          set -euo pipefail
+          umask 077
+          cat > terraform.tfvars <<EOF
+          logbeacon_secrets = ${LOGBEACON_SECRETS_HCL}
+          github_secrets = ${GITHUB_SECRETS_HCL}
+          cloudflare_secrets = ${CLOUDFLARE_SECRETS_HCL}
+          sonarqube_admin_password = "${SONARQUBE_ADMIN_PASSWORD}"
           environment = "${{ vars.ENVIRONMENT }}"
-          sonarqube_monitoring_passcode = "${{ secrets.SONARQUBE_MONITORING_PASSCODE }}"
+          sonarqube_monitoring_passcode = "${SONARQUBE_MONITORING_PASSCODE}"
           EOF
-
-          mv terraform.tfvars terraform/main-infra
 
       - name: Setup terraform
         uses: hashicorp/setup-terraform@v4
