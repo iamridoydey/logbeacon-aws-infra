@@ -2,6 +2,9 @@ terraform/*/.terraform
 terraform/*/.terraform.lock.hcl
 terraform/*/terraform.tfvars
 terraform/*/.env
+terraform/*/terraform-iam-audit
+terraform/*/permissions.*
+terraform/*/*trace.log
 
 ansible/inventory.ini
 .ansible
