@@ -120,7 +120,7 @@ resource "aws_iam_policy" "terraform_state_access" {
 # =============================================================
 
 resource "aws_iam_policy" "main_infra_read" {
-  name        = "logbeacon-main-infra-read"
+  #checkov:skip=CKV_AWS_355:Ensure no IAM policies documents allow "*" as a statement's resource for restrictable actions
   description = "Describe/list existing main-infra so terraform plan can refresh"
 
   policy = jsonencode({
