@@ -15,7 +15,7 @@ locals {
         Effect = "Allow"
 
         Principal = {
-          AWS = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root"
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
         }
 
         Action   = "kms:*"
