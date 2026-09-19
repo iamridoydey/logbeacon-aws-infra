@@ -56,13 +56,15 @@ module "workload_eks" {
   # Turned of cloudwatch
   create_cloudwatch_log_group = false
 
+  # Restrict eks module to create kms key
+  create_kms_key           = false
+  attach_encryption_policy = true
+
   # Kms secret config
-  encryption_config = [
-    {
-      resources        = ["secrets"]
-      provider_key_arn = aws_kms_key.workload_cluster.arn
-    }
-  ]
+  encryption_config = {
+    resources        = ["secrets"]
+    provider_key_arn = aws_kms_key.workload_cluster.arn
+  }
 
 
   # -----------------------------------------------------------
@@ -216,13 +218,15 @@ module "management_eks" {
   # Turned of cloudwatch
   create_cloudwatch_log_group = false
 
+  # Restrict eks module to create kms key
+  create_kms_key           = false
+  attach_encryption_policy = true
+
   # Kms secret config
-  encryption_config = [
-    {
-      resources        = ["secrets"]
-      provider_key_arn = aws_kms_key.management_cluster.arn
-    }
-  ]
+  encryption_config = {
+    resources        = ["secrets"]
+    provider_key_arn = aws_kms_key.management_cluster.arn
+  }
 
   # -----------------------------------------------------------
   # NETWORKING

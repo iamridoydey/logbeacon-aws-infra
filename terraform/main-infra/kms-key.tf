@@ -22,37 +22,23 @@ resource "aws_kms_key" "logbeacon_kms_key" {
   })
 }
 
+
+
+
 # =============================================================
 # Management Cluster KMS
 # =============================================================
 resource "aws_kms_key" "management_cluster" {
-  description             = "KMS key for management EKS cluster secrets"
+  description             = "logbeacon-management-cluster cluster encryption key"
   deletion_window_in_days = 7
   enable_key_rotation     = true
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowEKSClusterUseOfKey"
-        Effect = "Allow"
-        Principal = {
-          AWS = module.management_eks.cluster_iam_role_arn
-        }
-        Action = [
-          "kms:Encrypt",
-          "kms:Decrypt",
-          "kms:GenerateDataKey*"
-        ]
-        Resource = "*"
-      }
-    ]
+  policy = local.eks_kms_key_policy
+
+  tags = merge(local.common_tags, {
+    Name    = "${var.project_name}-management-cluster"
+    Cluster = "management"
   })
-
-  lifecycle {
-    prevent_destroy = true
-  }
-
 }
 
 resource "aws_kms_alias" "management_cluster" {
@@ -64,33 +50,16 @@ resource "aws_kms_alias" "management_cluster" {
 # Workload Cluster KMS
 # =============================================================
 resource "aws_kms_key" "workload_cluster" {
-  description             = "KMS key for workload EKS cluster secrets"
+  description             = "logbeacon-workload-cluster cluster encryption key"
   deletion_window_in_days = 7
   enable_key_rotation     = true
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowEKSClusterUseOfKey"
-        Effect = "Allow"
-        Principal = {
-          AWS = module.workload_eks.cluster_iam_role_arn
-        }
-        Action = [
-          "kms:Encrypt",
-          "kms:Decrypt",
-          "kms:GenerateDataKey*"
-        ]
-        Resource = "*"
-      }
-    ]
+  policy = local.eks_kms_key_policy
+
+  tags = merge(local.common_tags, {
+    Name    = "${var.project_name}-workload-cluster"
+    Cluster = "workload"
   })
-
-  lifecycle {
-    prevent_destroy = true
-  }
-
 }
 
 resource "aws_kms_alias" "workload_cluster" {
