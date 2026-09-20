@@ -461,8 +461,14 @@ resource "aws_iam_policy" "infra_ci_ssm_access" {
         Action = ["ssm:SendCommand", "ssm:StartSession"]
         Resource = [
           "arn:aws:ssm:${var.default_region}::document/AWS-RunShellScript",
-          "arn:aws:ssm:${var.default_region}::document/SSM-SessionManagerRunShell"
+          "arn:aws:ssm:${var.default_region}:${data.aws_caller_identity.current.account_id}:document/SSM-SessionManagerRunShell"
         ]
+      },
+      {
+        Sid      = "SsmOwnSessions"
+        Effect   = "Allow"
+        Action   = ["ssm:TerminateSession", "ssm:ResumeSession"]
+        Resource = "arn:aws:ssm:*:*:session/$${aws:userid}-*"
       },
       {
         Sid      = "SsmTargetAdmin"
