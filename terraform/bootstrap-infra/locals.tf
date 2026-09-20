@@ -23,8 +23,4 @@ locals {
     "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:sonarqube*",
     "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:workload-eks-cred*",
   ]
-
-  logbeacon_role_arn   = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/logbeacon-*"
-  logbeacon_policy_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/logbeacon-*"
 }
-
