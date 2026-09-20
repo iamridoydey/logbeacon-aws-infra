@@ -5,14 +5,12 @@ on:
       - main
     paths:
       - terraform/main-infra/**
+      - ansible/**
       - .github/workflows/main-ci-pr.yaml
 
+# Least privilege by default; each job asks for what it needs.
 permissions:
   contents: read
-  # Permission for requesting a short lived OIDC token
-  id-token: write
-  # Provide access the CodeQL Action API endpoints
-  security-events: write
 
 concurrency:
   group: main-infra
@@ -22,13 +20,21 @@ jobs:
   infra-validations:
     name: Infra validations
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Provide access the CodeQL Action API endpoints
+      security-events: write
 
     steps:
       # Clone git repo
       - uses: actions/checkout@v7
 
-      # Setup terraform and format the file
-      - uses: hashicorp/setup-terraform@v4
+      # terraform_wrapper: false = no longer need to output ${{ steps.tf.outputs.stdout }}
+      - name: Setup terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.16.3"
+          terraform_wrapper: false
 
       - name: Terraform fmt
         id: fmt
@@ -75,6 +81,8 @@ jobs:
   ansible-validations:
     name: Ansible validations
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       # Clone git repo
@@ -103,6 +111,10 @@ jobs:
     needs:
       - infra-validations
       - ansible-validations
+    permissions:
+      contents: read
+      # Permission for requesting a short lived OIDC token
+      id-token: write
 
     steps:
       - name: Configure aws
@@ -114,7 +126,7 @@ jobs:
       # Clone git repo
       - uses: actions/checkout@v7
 
-            # Generate terraform.tfvars
+      # Generate terraform.tfvars
       - name: Generate terraform.tfvars
         working-directory: terraform/main-infra
         env:
@@ -135,10 +147,13 @@ jobs:
           sonarqube_monitoring_passcode = "${SONARQUBE_MONITORING_PASSCODE}"
           EOF
 
+      # Must match the version used by the merge workflow. Terraform refuses to
+      # read state that was written by a newer version.
       - name: Setup terraform
         uses: hashicorp/setup-terraform@v4
         with:
-          terraform_version: "1.16.2"
+          terraform_version: "1.16.3"
+          terraform_wrapper: false
 
       - name: Run terraform init and plan
         env:
@@ -147,9 +162,10 @@ jobs:
         id: plan
         working-directory: terraform/main-infra
         run: |
-          terraform init
-          terraform plan --var-file="terraform.tfvars"
+          terraform init -input=false
+          terraform plan -input=false -lock-timeout=5m -var-file="terraform.tfvars"
 
-      - run: echo "${{ steps.plan.outputs.stdout }}"
-      - run: echo "${{ steps.plan.outputs.stderr }}"
-      - run: echo "${{ steps.plan.outputs.exitcode }}"
+      - name: Remove terraform.tfvars
+        if: always()
+        working-directory: terraform/main-infra
+        run: rm -f terraform.tfvars
