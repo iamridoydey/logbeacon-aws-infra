@@ -1,11 +1,17 @@
-name: Main ci destroy
+name: Main infra destroy
+
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type "destroy" to confirm tearing down all LogBeacon infra'
+        description: 'Type "destroy" to confirm tearing down main-infra'
         required: true
         type: string
+      skip_k8s_cleanup:
+        description: "Skip the Kubernetes cleanup and only run terraform destroy (use when the clusters are broken/unreachable)"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -16,185 +22,41 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Fails fast unless the person typed the exact confirmation word —
-  # a second, explicit check on top of the environment approval gate
-  # below, since this is the single most destructive pipeline in
-  # the project.
-  confirm-intent:
-    name: Confirm destroy intent
+  destroy:
+    name: Clean Kubernetes, then terraform destroy main-infra
+    # Only run when confirmed AND started from main.
+    if: ${{ inputs.confirm == 'destroy' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
-    steps:
-      - name: Check confirmation input
-        run: |
-          if [ "${{ github.event.inputs.confirm }}" != "destroy" ]; then
-            echo "Confirmation text did not match 'destroy'. Aborting."
-            exit 1
-          fi
-
-  teardown-cluster-and-infra:
-    name: Stop ArgoCD, delete apps, destroy infra
-    runs-on: ubuntu-latest
-    needs:
-      - confirm-intent
-    # Second gate — pauses for a human's explicit GitHub approval,
-    # on top of the typed confirmation above.
+    # Produces the OIDC subject "environment:main-infra-destroy" that the CI role trusts.
+    # Add required reviewers to this environment in GitHub settings.
     environment: main-infra-destroy
-    timeout-minutes: 90
+    timeout-minutes: 120
 
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
       TF_DIR: terraform/main-infra
 
     steps:
+      - name: Clone the repository
+        uses: actions/checkout@v7
+
       - name: Configure aws
         uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/logbeacon-infra-bootstrap-ci-role
 
-      - uses: actions/checkout@v7
-
-      # terraform_wrapper: false — needed for `terraform output -raw`
       - name: Setup terraform
         uses: hashicorp/setup-terraform@v4
         with:
-          terraform_version: "1.16.2"
+          terraform_version: "1.16.3"
           terraform_wrapper: false
 
-      # Read outputs from existing state before anything is touched —
-      # need the admin instance id and both cluster names to reach in
-      # and tear down cleanly. Names match outputs.tf / the merge
-      # pipeline exactly — keep these in sync if outputs.tf changes.
-      - name: Terraform init and read outputs
-        id: tf_outputs
-        working-directory: ${{ env.TF_DIR }}
-        run: |
-          terraform init -input=false
-          echo "logbeacon_admin_ec2_id=$(terraform output -raw logbeacon_admin_ec2_id)" >> "$GITHUB_OUTPUT"
-          echo "management_cluster_name=$(terraform output -raw management_cluster_name)" >> "$GITHUB_OUTPUT"
-          echo "workload_cluster_name=$(terraform output -raw workload_cluster_name)" >> "$GITHUB_OUTPUT"
-
-      # Wait until SSM Agent on the admin instance is Online — same
-      # check as the merge pipeline. If the instance is already
-      # gone or never came up, there is nothing left to tear down
-      # from inside the cluster, so fail loudly rather than silently
-      # skipping straight to terraform destroy against a live cluster.
-      - name: Wait for admin instance SSM
-        env:
-          INSTANCE_ID: ${{ steps.tf_outputs.outputs.logbeacon_admin_ec2_id }}
-        run: |
-          set -euo pipefail
-          for i in $(seq 1 30); do
-            status=$(aws ssm describe-instance-information \
-              --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
-              --query 'InstanceInformationList[0].PingStatus' \
-              --output text || true)
-            echo "SSM ping=${status}"
-            if [[ "${status}" == "Online" ]]; then
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "Admin instance never reported Online to SSM"
-          exit 1
-
-      # -----------------------------------------------------------
-      # Tear down all the argocd applications
-      # -----------------------------------------------------------
-      - name: Tear down ArgoCD-managed resources on admin EC2
-        env:
-          INSTANCE_ID: ${{ steps.tf_outputs.outputs.logbeacon_admin_ec2_id }}
-          MGMT_CLUSTER: ${{ steps.tf_outputs.outputs.management_cluster_name }}
-          WORKLOAD_CLUSTER: ${{ steps.tf_outputs.outputs.workload_cluster_name }}
-        run: |
-          set -euo pipefail
-
-          cat > /tmp/teardown.sh <<EOF
-          set -euo pipefail
-          export AWS_REGION="${AWS_REGION}"
-
-          aws eks update-kubeconfig --name "${MGMT_CLUSTER}" --region "${AWS_REGION}" --alias management
-          aws eks update-kubeconfig --name "${WORKLOAD_CLUSTER}" --region "${AWS_REGION}" --alias workload
-
-          kubectl config use-context management
-
-          echo "--- Disabling auto-sync on root Applications ---"
-          kubectl patch application management-root -n argocd --type merge \
-            -p '{"spec":{"syncPolicy":null}}' || true
-          kubectl patch application workload-root -n argocd --type merge \
-            -p '{"spec":{"syncPolicy":null}}' || true
-
-          echo "--- Orphan-deleting root Applications (children untouched) ---"
-          kubectl delete application management-root -n argocd \
-            --cascade=orphan --ignore-not-found
-          kubectl delete application workload-root -n argocd \
-            --cascade=orphan --ignore-not-found
-
-          echo "--- Cascade-deleting WORKLOAD-cluster Applications first ---"
-          kubectl get applications -n argocd -o name | \
-            grep -i workload | \
-            xargs -r -n1 kubectl delete --cascade=foreground -n argocd --timeout=300s
-
-          echo "--- Verifying no LoadBalancer Services remain (workload cluster) ---"
-          kubectl config use-context workload
-          for i in \$(seq 1 30); do
-            remaining=\$(kubectl get svc -A -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace}/{.metadata.name} {end}' | wc -w)
-            echo "LoadBalancer Services remaining: \${remaining}"
-            if [ "\${remaining}" -eq 0 ]; then
-              break
-            fi
-            sleep 15
-          done
-
-          echo "--- Verifying no Gateway API Gateways remain (workload cluster) ---"
-          for i in \$(seq 1 30); do
-            remaining=\$(kubectl get gateways.gateway.networking.k8s.io -A --no-headers 2>/dev/null | wc -l)
-            echo "Gateways remaining: \${remaining}"
-            if [ "\${remaining}" -eq 0 ]; then
-              break
-            fi
-            sleep 15
-          done
-
-          kubectl config use-context management
-
-          echo "--- Cascade-deleting MANAGEMENT-cluster Applications ---"
-          kubectl get applications -n argocd -o name | \
-            xargs -r -n1 kubectl delete --cascade=foreground -n argocd --timeout=300s
-
-          echo "--- All Applications removed. Uninstalling ArgoCD ---"
-          helm uninstall argocd -n argocd || true
-          kubectl delete namespace argocd --ignore-not-found
-          EOF
-
-          CMD_ID=\$(aws ssm send-command \
-            --instance-ids "${INSTANCE_ID}" \
-            --document-name "AWS-RunShellScript" \
-            --comment "argocd-teardown-${GITHUB_RUN_ID}" \
-            --timeout-seconds 3600 \
-            --parameters commands="\$(cat /tmp/teardown.sh)" \
-            --query 'Command.CommandId' \
-            --output text)
-
-          echo "SSM command id=\${CMD_ID}"
-          aws ssm wait command-executed \
-            --command-id "\${CMD_ID}" \
-            --instance-id "${INSTANCE_ID}"
-
-          aws ssm get-command-invocation \
-            --command-id "\${CMD_ID}" \
-            --instance-id "${INSTANCE_ID}" \
-            --query '{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}' \
-            --output json
-
-      # -----------------------------------------------------------
-      # Generate terraform.tfvars
-      # -----------------------------------------------------------
       - name: Generate terraform.tfvars
         working-directory: ${{ env.TF_DIR }}
         env:
           LOGBEACON_SECRETS_HCL: ${{ secrets.LOGBEACON_SECRETS }}
-          GITHUB_SECRETS_HCL: ${{ secrets.GITHUB_SECRETS }}
+          GITHUB_SECRETS_HCL: ${{ secrets.GH_SECRETS }}
           CLOUDFLARE_SECRETS_HCL: ${{ secrets.CLOUDFLARE_SECRETS }}
           SONARQUBE_ADMIN_PASSWORD: ${{ secrets.SONARQUBE_ADMIN_PASSWORD }}
           SONARQUBE_MONITORING_PASSCODE: ${{ secrets.SONARQUBE_MONITORING_PASSCODE }}
@@ -210,15 +72,282 @@ jobs:
           sonarqube_monitoring_passcode = "${SONARQUBE_MONITORING_PASSCODE}"
           EOF
 
-      - name: Terraform destroy
-        id: destroy
+      - name: Terraform init
         working-directory: ${{ env.TF_DIR }}
-        run: terraform destroy -input=false -auto-approve -var-file=terraform.tfvars
+        run: terraform init -input=false
+
+      # -----------------------------------------------------------------
+      # Decide whether there is anything to clean inside Kubernetes.
+      #
+      # Argo CD is only ever installed BY the admin EC2 (bootstrap step of the
+      # merge workflow). So no usable admin instance = no Argo CD = no
+      # Argo-created load balancers. In that case we skip and just destroy.
+      # -----------------------------------------------------------------
+      - name: Detect what exists
+        id: detect
+        working-directory: ${{ env.TF_DIR }}
+        env:
+          SKIP_K8S_CLEANUP: ${{ inputs.skip_k8s_cleanup }}
+        run: |
+          set -euo pipefail
+
+          # Read from state. Missing output (empty/partial state) => empty string.
+          out() { terraform output -raw "$1" 2>/dev/null || true; }
+          INSTANCE_ID=$(out logbeacon_admin_ec2_id)
+          MGMT=$(out management_cluster_name)
+          WORKLOAD=$(out workload_cluster_name)
+
+          {
+            echo "instance_id=${INSTANCE_ID}"
+            echo "management_cluster_name=${MGMT}"
+            echo "workload_cluster_name=${WORKLOAD}"
+          } >> "$GITHUB_OUTPUT"
+
+          CLEANUP=false
+
+          if [[ "${SKIP_K8S_CLEANUP}" == "true" ]]; then
+            echo "::warning::skip_k8s_cleanup=true. Load balancers/volumes created from Kubernetes will NOT be cleaned."
+          elif [[ -z "${INSTANCE_ID}" ]]; then
+            echo "No admin instance in Terraform state. Nothing was bootstrapped, skipping Kubernetes cleanup."
+          else
+            if RESULT=$(aws ec2 describe-instances \
+                --instance-ids "${INSTANCE_ID}" \
+                --query 'Reservations[0].Instances[0].State.Name' \
+                --output text 2>&1); then
+              STATE="${RESULT}"
+            elif grep -q 'InvalidInstanceID' <<<"${RESULT}"; then
+              STATE="not-found"
+            else
+              # Real error (permissions, network...). Do NOT silently skip.
+              echo "::error::Could not check the admin instance: ${RESULT}"
+              exit 1
+            fi
+            echo "Admin instance ${INSTANCE_ID} state: ${STATE}"
+
+            case "${STATE}" in
+              running|pending)
+                CLEANUP=true
+                ;;
+              not-found|None|terminated|shutting-down)
+                echo "Admin instance is gone. Skipping Kubernetes cleanup."
+                ;;
+              *)
+                echo "::error::Admin instance is '${STATE}', so the Kubernetes cleanup cannot run. Start it and re-run, or re-run with skip_k8s_cleanup=true if you accept leftover AWS resources."
+                exit 1
+                ;;
+            esac
+          fi
+
+          echo "cleanup=${CLEANUP}" >> "$GITHUB_OUTPUT"
+          echo "Kubernetes cleanup: ${CLEANUP}"
+
+      - name: Wait for admin instance SSM
+        if: steps.detect.outputs.cleanup == 'true'
+        env:
+          INSTANCE_ID: ${{ steps.detect.outputs.instance_id }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 30); do
+            status=$(aws ssm describe-instance-information \
+              --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
+              --query 'InstanceInformationList[0].PingStatus' \
+              --output text || true)
+            echo "SSM ping=${status}"
+            if [[ "${status}" == "Online" ]]; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Admin instance never reported Online to SSM. Fix it, or re-run with skip_k8s_cleanup=true."
+          exit 1
+
+      # -----------------------------------------------------------------
+      # Runs ON the admin EC2 (it can reach the private EKS API).
+      #
+      # Order matters:
+      #  1. Stop Argo CD so it cannot recreate what we delete.
+      #  2. Delete Ingresses + LoadBalancer Services while the controllers
+      #     (AWS LB controller, external-dns) are still alive. The delete only
+      #     finishes after the controller removed the AWS load balancer.
+      #  3. Best effort: delete app namespaces so EBS volumes are released.
+      #
+      # Clusters that do not exist / are not ACTIVE are skipped.
+      # A cluster that exists but is unreachable is an error (would leak LBs).
+      # -----------------------------------------------------------------
+      - name: Clean up Kubernetes (load balancers, volumes)
+        if: steps.detect.outputs.cleanup == 'true'
+        env:
+          INSTANCE_ID: ${{ steps.detect.outputs.instance_id }}
+          MGMT_CLUSTER: ${{ steps.detect.outputs.management_cluster_name }}
+          WORKLOAD_CLUSTER: ${{ steps.detect.outputs.workload_cluster_name }}
+        run: |
+          set -euo pipefail
+
+          cat > /tmp/cleanup_body.sh <<'EOF'
+          set -uo pipefail
+          export HOME=/root
+
+          LB_WAIT="10m"   # ingress / service deletion (waits for AWS to delete the LB)
+          NS_WAIT="5m"    # namespace deletion (best effort)
+          # Namespaces that are never deleted. Add the namespace of any controller
+          # that must survive until the end (for example the EBS CSI driver).
+          KEEP_NS='^(default|kube-system|kube-public|kube-node-lease|argocd)$'
+
+          FAILED=0
+          READY=()
+
+          kc() { kubectl --kubeconfig "/tmp/kubeconfig-${CUR}" "$@"; }
+
+          echo "##### Phase 0: check which clusters exist and are reachable"
+          for C in ${CLUSTERS}; do
+            echo "=== ${C}"
+            if ! STATUS=$(aws eks describe-cluster --name "${C}" --region "${AWS_REGION}" \
+                --query cluster.status --output text 2>&1); then
+              if grep -q ResourceNotFoundException <<<"${STATUS}"; then
+                echo "skip: cluster does not exist"
+              else
+                echo "ERROR: cannot describe cluster: ${STATUS}"
+                FAILED=1
+              fi
+              continue
+            fi
+            if [[ "${STATUS}" != "ACTIVE" ]]; then
+              echo "skip: cluster status is ${STATUS}"
+              continue
+            fi
+            if ! aws eks update-kubeconfig --name "${C}" --region "${AWS_REGION}" \
+                --kubeconfig "/tmp/kubeconfig-${C}" >/dev/null 2>&1; then
+              echo "ERROR: update-kubeconfig failed for ${C}"
+              FAILED=1
+              continue
+            fi
+            CUR="${C}"
+            if ! kc get namespaces >/dev/null 2>&1; then
+              echo "ERROR: ${C} is ACTIVE but the admin instance cannot reach/authenticate to it"
+              FAILED=1
+              continue
+            fi
+            READY+=("${C}")
+          done
+
+          if [[ ${#READY[@]} -eq 0 ]]; then
+            echo "No reachable clusters. Nothing to clean."
+            exit ${FAILED}
+          fi
+
+          echo "##### Phase 1: stop Argo CD so it cannot recreate resources"
+          for CUR in "${READY[@]}"; do
+            if kc get namespace argocd >/dev/null 2>&1; then
+              echo "=== ${CUR}: scaling Argo CD to 0"
+              kc -n argocd scale deployment,statefulset --all --replicas=0 || FAILED=1
+            else
+              echo "=== ${CUR}: no argocd namespace"
+            fi
+          done
+          sleep 15
+
+          echo "##### Phase 2: delete Ingresses and LoadBalancer Services"
+          for CUR in "${READY[@]}"; do
+            echo "=== ${CUR}"
+            COUNT=$(kc get ingress --all-namespaces --no-headers 2>/dev/null | wc -l)
+
+            echo "Deleting Ingresses"
+            kc delete ingress --all --all-namespaces --wait=true --timeout="${LB_WAIT}" || {
+              echo "ERROR: ingress deletion did not finish"; FAILED=1; }
+
+            echo "Deleting Services of type LoadBalancer"
+            while read -r NS NAME; do
+              [[ -z "${NAME:-}" ]] && continue
+              COUNT=$((COUNT + 1))
+              kc -n "${NS}" delete service "${NAME}" --wait=true --timeout="${LB_WAIT}" || {
+                echo "ERROR: service ${NS}/${NAME} deletion did not finish"; FAILED=1; }
+            done < <(kc get services --all-namespaces \
+              -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace} {.metadata.name}{"\n"}{end}')
+
+            if (( COUNT > 0 )); then
+              echo "Waiting 90s so external-dns can remove DNS records"
+              sleep 90
+            fi
+          done
+
+          echo "##### Phase 3 (best effort): delete app namespaces to release EBS volumes"
+          for CUR in "${READY[@]}"; do
+            echo "=== ${CUR}"
+            NAMESPACES=$(kc get namespaces -o jsonpath='{.items[*].metadata.name}')
+            TO_DELETE=()
+            for NS in ${NAMESPACES}; do
+              [[ "${NS}" =~ ${KEEP_NS} ]] && continue
+              TO_DELETE+=("${NS}")
+            done
+            for NS in "${TO_DELETE[@]:-}"; do
+              [[ -z "${NS}" ]] && continue
+              kc delete namespace "${NS}" --wait=false || true
+            done
+            for NS in "${TO_DELETE[@]:-}"; do
+              [[ -z "${NS}" ]] && continue
+              kc wait --for=delete "namespace/${NS}" --timeout="${NS_WAIT}" \
+                || echo "WARNING: namespace ${NS} is still terminating"
+            done
+            LEFT=$(kc get persistentvolumes --no-headers 2>/dev/null | wc -l)
+            if (( LEFT > 0 )); then
+              echo "WARNING: ${LEFT} PersistentVolume(s) remain in ${CUR}; check EC2 > Volumes for leftovers"
+            fi
+          done
+
+          exit ${FAILED}
+          EOF
+
+          {
+            echo '#!/bin/bash'
+            printf 'export AWS_REGION=%q\n' "${AWS_REGION}"
+            printf 'export CLUSTERS=%q\n' "${MGMT_CLUSTER} ${WORKLOAD_CLUSTER}"
+            cat /tmp/cleanup_body.sh
+          } > /tmp/cleanup.sh
+
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "${INSTANCE_ID}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "k8s-cleanup-${GITHUB_RUN_ID}" \
+            --timeout-seconds 600 \
+            --parameters "$(jq -n --arg s "$(cat /tmp/cleanup.sh)" '{commands:[$s], executionTimeout:["3000"]}')" \
+            --query 'Command.CommandId' \
+            --output text)
+          echo "SSM command id=${CMD_ID}"
+
+          # Poll (the built-in waiter gives up after ~100s). Up to 50 minutes.
+          STATUS=Pending
+          for i in $(seq 1 300); do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "${CMD_ID}" \
+              --instance-id "${INSTANCE_ID}" \
+              --query Status \
+              --output text 2>/dev/null || echo Pending)
+            echo "SSM status=${STATUS}"
+            case "${STATUS}" in
+              Success|Failed|Cancelled|TimedOut) break ;;
+            esac
+            sleep 10
+          done
+
+          echo "----- cleanup output -----"
+          aws ssm get-command-invocation --command-id "${CMD_ID}" --instance-id "${INSTANCE_ID}" \
+            --query StandardOutputContent --output text
+          echo "----- cleanup errors -----"
+          aws ssm get-command-invocation --command-id "${CMD_ID}" --instance-id "${INSTANCE_ID}" \
+            --query StandardErrorContent --output text
+
+          # If this fails, terraform destroy does NOT run, so nothing is orphaned.
+          [[ "${STATUS}" == "Success" ]]
+
+      - name: Terraform destroy plan
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform plan -destroy -input=false -lock-timeout=5m -var-file=terraform.tfvars -out=tfdestroy
+
+      - name: Terraform destroy
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform apply -input=false -auto-approve tfdestroy
 
       - name: Remove terraform.tfvars
         if: always()
         working-directory: ${{ env.TF_DIR }}
-        run: rm -f terraform.tfvars
-
-      - name: Done
-        run: echo "LogBeacon main-infra teardown complete."
+        run: rm -f terraform.tfvars tfdestroy
