@@ -91,6 +91,7 @@ resource "aws_iam_role_policy_attachment" "workload_secrets_kms_decrypt" {
   policy_arn = aws_iam_policy.secret_kms_decrypt.arn
 }
 
+
 # =============================================================
 #       WORKLOAD CLUSTER - EXTERNAL SECRETS POD IDENTITY
 # =============================================================
@@ -216,6 +217,7 @@ resource "aws_iam_role_policy_attachment" "sonarqube_bootstrap_kms" {
   policy_arn = aws_iam_policy.secret_kms_read_write.arn
 }
 
+
 # =============================================================
 #       SONARQUBE BOOTSTRAP POD IDENTITY
 # =============================================================
@@ -332,6 +334,39 @@ resource "aws_iam_policy" "management_secret_policy" {
 }
 
 
+# =============================================================
+#       WORKLOAD EKS CRED READ POLICY
+# =============================================================
+
+resource "aws_iam_policy" "workload_eks_cred_read_policy" {
+  name = "workload-eks-cred-read-policy"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+
+    Statement = [
+      {
+        Sid    = "ReadWorkloadEksCredentials"
+        Effect = "Allow"
+
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+
+        Resource = "arn:aws:secretsmanager:${var.default_region}:${data.aws_caller_identity.current.account_id}:secret:workload-eks-cred*"
+      }
+    ]
+  })
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "workload-eks-cred-read-policy"
+    }
+  )
+}
+
 
 # =============================================================
 #       MANAGEMENT CLUSTER - POLICY ATTACHMENTS
@@ -343,17 +378,16 @@ resource "aws_iam_role_policy_attachment" "management_secret_attachment" {
 }
 
 
-# Policy workload-eks-cred-read-policy is in bootstrap-infra
 resource "aws_iam_role_policy_attachment" "workload_eks_cred_read_attachment" {
   role       = aws_iam_role.management_secrets_role.name
-  policy_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/workload-eks-cred-read-policy"
+  policy_arn = aws_iam_policy.workload_eks_cred_read_policy.arn
 }
+
 
 resource "aws_iam_role_policy_attachment" "management_secrets_kms_decrypt" {
   role       = aws_iam_role.management_secrets_role.name
-  policy_arn = aws_iam_policy.management_secret_policy.arn
+  policy_arn = aws_iam_policy.secret_kms_decrypt.arn
 }
-
 
 
 # =============================================================
@@ -373,4 +407,3 @@ resource "aws_eks_pod_identity_association" "management_secrets" {
     }
   )
 }
-
