@@ -69,3 +69,8 @@ jobs:
             -input=false \
             -auto-approve \
             destroy.tfplan
+
+      - name: Remove terraform.tfvars
+        if: always()
+        working-directory: terraform/bootstrap-infra
+        run: rm -f terraform.tfvars tfplan

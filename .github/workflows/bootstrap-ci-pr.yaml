@@ -120,3 +120,8 @@ jobs:
           terraform plan \
             -input=false \
             -var-file="terraform.tfvars"
+      
+      - name: Remove terraform.tfvars
+        if: always()
+        working-directory: terraform/bootstrap-infra
+        run: rm -f terraform.tfvars tfplan
