@@ -107,16 +107,41 @@ jobs:
           done
           echo "Admin instance never reported Online to SSM"
           exit 1
+      
+      # Setup ansible
+      - name: Setup Ansible
+        uses: alex-oleshkevich/setup-ansible@v1.0.1
+        with:
+          version: "9.3.0"
 
-      # Setup and run ansible playbook
-      - name: Install tools on admin with Ansible
+      - name: Install Python AWS dependencies
         run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ansible
+          python -m pip install boto3 botocore
 
-          ansible-playbook ansible/playbook.yaml -i ansible/inventory.ini \
+      - name: Install amazon.aws collection
+        run: |
+          ansible-galaxy collection install amazon.aws
+
+      - name: Install Session Manager plugin
+        run: |
+          curl -fsSL \
+            "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" \
+            -o /tmp/session-manager-plugin.deb
+
+          sudo dpkg -i /tmp/session-manager-plugin.deb
+
+      - name: Verify Ansible
+        run: |
+          ansible --version
+          ansible-galaxy collection list
+
+      - name: Run Ansible
+        run: |
+          ansible-playbook \
+            ansible/playbook.yaml \
+            -i ansible/inventory.ini \
             -e "management_cluster_name=${{ steps.tf_outputs.outputs.management_cluster_name }}" \
-            -e "aws_region=${AWS_REGION}"
+            -e "aws_region=${{ vars.AWS_REGION }}"
 
       # Run the cluster bootstrap ON the admin EC2.
       # send-command = fire a script and wait. start-session = interactive login (useless here).
