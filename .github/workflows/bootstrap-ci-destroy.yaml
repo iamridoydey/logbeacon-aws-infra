@@ -2,29 +2,37 @@ name: Bootstrap ci on destroy
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DESTROY to confirm"
+        required: true
+        type: string
 
 permissions:
   contents: read
-  # Required for GitHub OIDC
   id-token: write
 
+concurrency:
+  group: logbeacon-bootstrap-infra
+  cancel-in-progress: false
+
 jobs:
-  configure-aws-and-destroy-tf-resources:
-    name: Configure AWS and destroy bootstrap infra
+  destroy:
+    if: ${{ inputs.confirm == 'DESTROY' }}
     runs-on: ubuntu-latest
 
+    environment: bootstrap-destroy
+
     steps:
-      # Authenticate to AWS through GitHub OIDC
       - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/bootstrap-infra-role
 
-      # Clone repository
-      - uses: actions/checkout@v7
+      - name: Checkout repository
+        uses: actions/checkout@v7
 
-      # Generate required Terraform variables
       - name: Generate terraform.tfvars
         working-directory: terraform/bootstrap-infra
         run: |
@@ -32,26 +40,32 @@ jobs:
           environment       = "${{ vars.ENVIRONMENT }}"
           github_username   = "${{ vars.GH_USERNAME }}"
           github_account_id = "${{ vars.GH_ACCOUNT_ID }}"
-          github_repo_id = "${{ vars.GH_REPO_ID }}"
+          github_repo_id    = "${{ vars.GH_REPO_ID }}"
           EOF
 
-      # Install Terraform
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
         with:
-          terraform_version: "1.16.2"
+          terraform_version: "1.16.3"
+          terraform_wrapper: false
 
-      # Initialize backend
       - name: Terraform Init
         working-directory: terraform/bootstrap-infra
         run: terraform init -input=false
 
-      # Destroy resources stored in bootstrap-infra state
-      - name: Terraform Destroy
-        id: destroy
+      - name: Terraform Destroy Plan
         working-directory: terraform/bootstrap-infra
         run: |
-          terraform destroy \
+          terraform plan \
+            -destroy \
+            -input=false \
+            -var-file="terraform.tfvars" \
+            -out=destroy.tfplan
+
+      - name: Terraform Destroy
+        working-directory: terraform/bootstrap-infra
+        run: |
+          terraform apply \
             -input=false \
             -auto-approve \
-            -var-file="terraform.tfvars"
+            destroy.tfplan
