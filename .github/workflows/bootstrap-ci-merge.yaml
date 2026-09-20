@@ -42,7 +42,6 @@ jobs:
           github_repo_id = "${{ vars.GH_REPO_ID }}"
           EOF
 
-
       # terraform_wrapper: false = no longer need to output ${{ steps.tf.outputs.stdout }}
       - name: Setup terraform
         uses: hashicorp/setup-terraform@v4
