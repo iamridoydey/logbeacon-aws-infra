@@ -34,6 +34,7 @@ jobs:
 
       # Generate terraform.tfvars
       - name: Generate terraform.tfvars
+        working-directory: terraform/bootstrap-infra
         run: |
           cat > terraform.tfvars <<-EOF
           environment = "${{ vars.ENVIRONMENT }}"
@@ -72,3 +73,8 @@ jobs:
             -input=false \
             -auto-approve \
             tfplan
+      
+      - name: Remove terraform.tfvars
+        if: always()
+        working-directory: terraform/bootstrap-infra
+        run: rm -f terraform.tfvars tfplan
