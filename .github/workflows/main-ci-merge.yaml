@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - terraform/main-infra/**
+      - ansible/**
       - .github/workflows/main-ci-merge.yml
   workflow_dispatch:
 
@@ -13,6 +14,7 @@ permissions:
   contents: read
   id-token: write
 
+# One apply at a time. Do not share this group with the PR workflow.
 concurrency:
   group: main-infra
   cancel-in-progress: false
@@ -21,6 +23,7 @@ jobs:
   configure-aws-apply-and-bootstrap:
     name: Configure aws, apply infra, bootstrap cluster
     runs-on: ubuntu-latest
+    # Manual approval in GitHub Environment settings.
     environment: main-infra-production
     timeout-minutes: 90
 
@@ -29,7 +32,7 @@ jobs:
       TF_DIR: terraform/main-infra
 
     steps:
-      # Same majors as the rest of the project pipelines.
+      # Same action majors as the rest of the project pipelines.
       - name: Clone the repository
         uses: actions/checkout@v7
 
@@ -39,14 +42,17 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/logbeacon-infra-bootstrap-ci-role
 
-      # terraform_wrapper: false = no longer need to output ${{ steps.tf.outputs.stdout }}
+      # terraform_wrapper: false = real terraform binary, no stdout wrapper.
       - name: Setup terraform
         uses: hashicorp/setup-terraform@v4
         with:
-          terraform_version: "1.16.3"
+          terraform_version: "1.16.2"
           terraform_wrapper: false
 
-      # Generate terraform.tfvars
+      # Maps must NOT be wrapped in extra quotes or Terraform sees a string.
+      # Store LOGBEACON_SECRETS / GH_SECRETS / CLOUDFLARE_SECRETS as HCL:
+      #   { key = "value" }
+      # Passwords and names stay quoted — they are strings.
       - name: Generate terraform.tfvars
         working-directory: ${{ env.TF_DIR }}
         env:
@@ -107,47 +113,39 @@ jobs:
           done
           echo "Admin instance never reported Online to SSM"
           exit 1
-      
-      # Setup ansible
-      - name: Setup Ansible
-        uses: alex-oleshkevich/setup-ansible@v1.0.1
+
+      # inventory.ini uses connection: amazon.aws.aws_ssm
+      # pip install ansible does NOT install that plugin.
+      # amazon.aws collection + boto3 + session-manager-plugin are required.
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          version: "9.3.0"
+          python-version: "3.12"
 
-      - name: Install Python AWS dependencies
+      - name: Install Ansible SSM connection
         run: |
-          python -m pip install boto3 botocore
-
-      - name: Install amazon.aws collection
-        run: |
+          pip install ansible boto3 botocore
           ansible-galaxy collection install amazon.aws
+          curl -sS -o /tmp/ssm.deb \
+            https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb
+          sudo dpkg -i /tmp/ssm.deb
 
-      - name: Install Session Manager plugin
+      - name: Install tools on admin with Ansible
         run: |
-          curl -fsSL \
-            "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" \
-            -o /tmp/session-manager-plugin.deb
-
-          sudo dpkg -i /tmp/session-manager-plugin.deb
-
-      - name: Verify Ansible
-        run: |
-          ansible --version
-          ansible-galaxy collection list
-
-      - name: Run Ansible
-        run: |
-          ansible-playbook \
-            ansible/playbook.yaml \
-            -i ansible/inventory.ini \
+          ansible-playbook ansible/playbook.yaml -i ansible/inventory.ini \
             -e "management_cluster_name=${{ steps.tf_outputs.outputs.management_cluster_name }}" \
-            -e "aws_region=${{ vars.AWS_REGION }}"
+            -e "aws_region=${AWS_REGION}"
 
       # Run the cluster bootstrap ON the admin EC2.
-      # send-command = fire a script and wait. start-session = interactive login (useless here).
+      # send-command = fire a script and wait.
+      # start-session = interactive login (useless in CI).
       #
-      # The instance profile must allow eks:DescribeCluster (update-kubeconfig)
-      # and the node/instance must reach the EKS API.
+      # Instance profile must allow eks:DescribeCluster (update-kubeconfig)
+      # and the instance must reach the EKS API.
+      #
+      # Why send-command?
+      # There is no interactive CLI user on the runner.
+      # Put the work in a script, SSM executes it on the instance.
       - name: Bootstrap Argo CD on admin EC2
         env:
           INSTANCE_ID: ${{ steps.tf_outputs.outputs.logbeacon_admin_ec2_id }}
@@ -156,75 +154,47 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Script that SSM will execute as root/ssm-user on the instance.
-          # Unquoted EOF: ${CLUSTER}, ${AWS_REGION}, ${GITHUB_USERNAME} are filled in here on the runner.
           cat > /tmp/bootstrap.sh <<EOF
-          #!/bin/bash
           set -euo pipefail
-          export HOME=/root
           export AWS_REGION="${AWS_REGION}"
           aws eks update-kubeconfig --name "${CLUSTER}" --region "${AWS_REGION}"
-
-          cd /opt
-          # Idempotent: the admin instance persists, so the repo may already exist.
-          if [ -d logbeacon-aws-k8s/.git ]; then
-            git -C logbeacon-aws-k8s pull --ff-only
+          if [ ! -d /opt/logbeacon-aws-k8s ]; then
+            sudo git clone https://github.com/${GITHUB_USERNAME}/logbeacon-aws-k8s.git /opt/logbeacon-aws-k8s
           else
-            git clone https://github.com/${GITHUB_USERNAME}/logbeacon-aws-k8s.git
+            sudo git -C /opt/logbeacon-aws-k8s pull --ff-only
           fi
-
           helm repo add argo https://argoproj.github.io/argo-helm
           helm repo update
           helm upgrade --install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
             --wait \
-            -f /opt/logbeacon-aws-k8s/argocd/argocd-values.yaml
-
+            -f /opt/logbeacon-aws-k8s/infra/argocd-values.yaml
           kubectl apply -f /opt/logbeacon-aws-k8s/argocd/management-root.yaml
           EOF
 
-          # Why we are using send-command?
-          # Because in interactive session we have to run the command from cli.
-          # But there is no cli user. That's why we put all the task in the bootstrap.sh.
-          # Then this file execute and we will successfully able to start the root argo app.
-          # jq builds the JSON so commas/quotes in the script can't break --parameters.
           CMD_ID=$(aws ssm send-command \
             --instance-ids "${INSTANCE_ID}" \
             --document-name "AWS-RunShellScript" \
             --comment "argocd-bootstrap-${GITHUB_RUN_ID}" \
             --timeout-seconds 1200 \
-            --parameters "$(jq -n --arg s "$(cat /tmp/bootstrap.sh)" '{commands:[$s]}')" \
+            --parameters commands="$(cat /tmp/bootstrap.sh)" \
             --query 'Command.CommandId' \
             --output text)
 
           echo "SSM command id=${CMD_ID}"
+          aws ssm wait command-executed \
+            --command-id "${CMD_ID}" \
+            --instance-id "${INSTANCE_ID}"
 
-          # Poll instead of `aws ssm wait` (its waiter gives up after ~100s,
-          # but helm --wait can take longer). Up to 20 minutes here.
-          STATUS=Pending
-          for i in $(seq 1 120); do
-            STATUS=$(aws ssm get-command-invocation \
-              --command-id "${CMD_ID}" \
-              --instance-id "${INSTANCE_ID}" \
-              --query Status \
-              --output text 2>/dev/null || echo Pending)
-            echo "SSM status=${STATUS}"
-            case "${STATUS}" in
-              Success|Failed|Cancelled|TimedOut) break ;;
-            esac
-            sleep 10
-          done
-
-          # Always print the output, even on failure.
           aws ssm get-command-invocation \
             --command-id "${CMD_ID}" \
             --instance-id "${INSTANCE_ID}" \
             --query '{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}' \
             --output json
 
-          # Fail the step unless the script really succeeded.
-          [[ "${STATUS}" == "Success" ]]
+      # From here ArgoCD app-of-apps reconciles downstream apps
+      # (external-secrets, cert-manager, sonarqube, workload-root).
 
       - name: Remove terraform.tfvars
         if: always()
