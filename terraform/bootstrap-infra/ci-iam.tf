@@ -262,6 +262,12 @@ resource "aws_iam_policy" "main_infra_apply" {
         Resource = concat(local.app_buckets, [for b in local.app_buckets : "${b}/*"])
       },
       {
+        Sid      = "DestroyVersionedBuckets"
+        Effect   = "Allow"
+        Action   = ["s3:DeleteObjectVersion", "s3:ListBucketVersions"]
+        Resource = concat(local.app_buckets, [for b in local.app_buckets : "${b}/*"])
+      },
+      {
         Sid      = "ServiceLinkedRoles"
         Effect   = "Allow"
         Action   = ["iam:CreateServiceLinkedRole"]
