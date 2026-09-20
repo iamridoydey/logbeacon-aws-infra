@@ -328,9 +328,13 @@ resource "aws_iam_policy" "main_infra_apply" {
           "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/*ebs-csi*",
           "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/*sonarqube*",
           "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/*cluster*",
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/management-eks-node-group-*",
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/workload-eks-node-group-*",
           local.logbeacon_policy_arn,
           "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/*secrets*",
           "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/*sonarqube*",
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/*argocd*",
+          "arn:aws:iam::${data.aws_caller_identity.current.account_id}:policy/AmazonEKS_EBS_CSI-*",
           "arn:aws:iam::${data.aws_caller_identity.current.account_id}:instance-profile/logbeacon-*",
           "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/oidc.eks.${var.default_region}.amazonaws.com/id/*"
         ]
