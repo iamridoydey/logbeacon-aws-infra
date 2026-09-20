@@ -123,6 +123,7 @@ resource "aws_iam_policy" "terraform_state_access" {
 
 resource "aws_iam_policy" "main_infra_read" {
   #checkov:skip=CKV_AWS_355:Ensure no IAM policies documents allow "*" as a statement's resource for restrictable actions
+  name        = "logbeacon-main-infra-read"
   description = "Describe/list existing main-infra so terraform plan can refresh"
 
   policy = jsonencode({
@@ -183,6 +184,32 @@ resource "aws_iam_policy" "main_infra_read" {
         Effect   = "Allow"
         Action   = ["secretsmanager:DescribeSecret", "secretsmanager:GetResourcePolicy", "secretsmanager:ListSecrets"]
         Resource = "*"
+      },
+      {
+        Sid      = "SecretsGetForPlanRefresh"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = local.secret_arns
+      },
+      {
+        Sid    = "S3ReadAppBuckets"
+        Effect = "Allow"
+        Action = [
+          "s3:GetBucketPublicAccessBlock",
+          "s3:GetEncryptionConfiguration",
+          "s3:GetLifecycleConfiguration",
+          "s3:GetBucketLogging",
+          "s3:GetBucketVersioning",
+          "s3:GetBucketPolicy",
+          "s3:GetBucketAcl",
+          "s3:GetBucketLocation",
+          "s3:GetBucketTagging",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          "arn:aws:s3:::logbeacon-log-bucket",
+          "arn:aws:s3:::logbeacon-ansible-ssm-transfer"
+        ]
       },
       {
         Sid    = "EcrRead"
