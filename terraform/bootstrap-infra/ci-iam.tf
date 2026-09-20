@@ -456,10 +456,13 @@ resource "aws_iam_policy" "infra_ci_ssm_access" {
         Resource = "*"
       },
       {
-        Sid      = "SsmDocuments"
-        Effect   = "Allow"
-        Action   = ["ssm:SendCommand", "ssm:StartSession"]
-        Resource = "arn:aws:ssm:${var.default_region}::document/AWS-RunShellScript"
+        Sid    = "SsmDocuments"
+        Effect = "Allow"
+        Action = ["ssm:SendCommand", "ssm:StartSession"]
+        Resource = [
+          "arn:aws:ssm:${var.default_region}::document/AWS-RunShellScript",
+          "arn:aws:ssm:${var.default_region}::document/SSM-SessionManagerRunShell"
+        ]
       },
       {
         Sid      = "SsmTargetAdmin"
