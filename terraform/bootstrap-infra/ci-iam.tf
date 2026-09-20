@@ -162,7 +162,11 @@ resource "aws_iam_policy" "main_infra_read" {
           "iam:ListInstanceProfiles",
           "iam:ListOpenIDConnectProviders",
           "iam:ListRoles",
-          "iam:ListPolicies"
+          "iam:ListPolicies",
+          "iam:ListPolicyTags",
+          "iam:ListRoleTags",
+          "iam:ListInstanceProfileTags",
+          "iam:ListOpenIDConnectProviderTags"
         ]
         Resource = "*"
       },
@@ -180,6 +184,19 @@ resource "aws_iam_policy" "main_infra_read" {
         Resource = "*"
       },
       {
+        # Reading a secret value encrypted with a customer-managed key also
+        # needs kms:Decrypt. Limited to use through Secrets Manager only.
+        Sid      = "KmsDecryptForSecrets"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = "arn:aws:kms:${var.default_region}:${data.aws_caller_identity.current.account_id}:key/*"
+        Condition = {
+          StringEquals = {
+            "kms:ViaService" = "secretsmanager.${var.default_region}.amazonaws.com"
+          }
+        }
+      },
+      {
         Sid      = "SecretsDescribe"
         Effect   = "Allow"
         Action   = ["secretsmanager:DescribeSecret", "secretsmanager:GetResourcePolicy", "secretsmanager:ListSecrets"]
@@ -195,16 +212,23 @@ resource "aws_iam_policy" "main_infra_read" {
         Sid    = "S3ReadAppBuckets"
         Effect = "Allow"
         Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation",
+          "s3:GetBucketAcl",
+          "s3:GetBucketPolicy",
+          "s3:GetBucketTagging",
+          "s3:GetBucketVersioning",
+          "s3:GetBucketLogging",
           "s3:GetBucketPublicAccessBlock",
+          "s3:GetBucketOwnershipControls",
+          "s3:GetBucketCORS",
+          "s3:GetBucketWebsite",
+          "s3:GetBucketRequestPayment",
+          "s3:GetBucketObjectLockConfiguration",
+          "s3:GetAccelerateConfiguration",
           "s3:GetEncryptionConfiguration",
           "s3:GetLifecycleConfiguration",
-          "s3:GetBucketLogging",
-          "s3:GetBucketVersioning",
-          "s3:GetBucketPolicy",
-          "s3:GetBucketAcl",
-          "s3:GetBucketLocation",
-          "s3:GetBucketTagging",
-          "s3:ListBucket"
+          "s3:GetReplicationConfiguration"
         ]
         Resource = [
           "arn:aws:s3:::logbeacon-log-bucket",
@@ -233,7 +257,6 @@ resource "aws_iam_policy" "main_infra_read" {
 
   tags = merge(local.common_tags, { Name = "logbeacon-main-infra-read" })
 }
-
 # =============================================================
 # APPLY / DESTROY
 # =============================================================
