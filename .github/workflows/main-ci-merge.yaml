@@ -171,7 +171,7 @@ jobs:
             --namespace argocd \
             --create-namespace \
             --wait \
-            -f /opt/logbeacon-aws-k8s/infra/argocd-values.yaml
+            -f /opt/logbeacon-aws-k8s/argocd/argocd-values.yaml
           kubectl apply -f /opt/logbeacon-aws-k8s/argocd/management-root.yaml
           EOF
 
