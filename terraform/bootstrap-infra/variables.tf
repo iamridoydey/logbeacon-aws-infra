@@ -34,3 +34,9 @@ variable "github_repo_id" {
   description = "Github repo id"
   type        = string
 }
+
+
+variable "github_logbeacon_app_repo_id" {
+  description = "Github logbeacon app repo id"
+  type        = string
+}

@@ -12,9 +12,9 @@ module "logbeacon_app_ci_role" {
   enable_github_oidc = true
 
   oidc_wildcard_subjects = [
-    "repo:${var.github_username}/logbeacon-app:ref:refs/heads/main",
-    "repo:${var.github_username}/logbeacon-app:pull_request",
-    "repo:${var.github_username}/logbeacon-app:environment:app-release-production",
+    "repo:${var.github_username}@${var.github_account_id}/logbeacon-aws-infra@${var.github_logbeacon_app_repo_id}:pull_request",
+    "repo:${var.github_username}@${var.github_account_id}/logbeacon-aws-infra@${var.github_logbeacon_app_repo_id}:ref:refs/heads/main",
+    "repo:${var.github_username}@${var.github_account_id}/logbeacon-aws-infra@${var.github_logbeacon_app_repo_id}:environment:app-release-production",
   ]
 
   policies = {
