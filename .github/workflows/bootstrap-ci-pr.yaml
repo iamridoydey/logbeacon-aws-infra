@@ -98,6 +98,7 @@ jobs:
           github_username   = "${{ vars.GH_USERNAME }}"
           github_account_id = "${{ vars.GH_ACCOUNT_ID }}"
           github_repo_id    = "${{ vars.GH_REPO_ID }}"
+          github_logbeacon_app_repo_id = "${{ vars.GH_LOGBEACON_APP_REPO_ID }}"
           EOF
 
       - name: Setup terraform
