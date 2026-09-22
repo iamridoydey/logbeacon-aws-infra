@@ -166,9 +166,9 @@ jobs:
       #
       # Order matters:
       #  1. Stop Argo CD so it cannot recreate what we delete.
-      #  2. Delete Ingresses + LoadBalancer Services while the controllers
-      #     (AWS LB controller, external-dns) are still alive. The delete only
-      #     finishes after the controller removed the AWS load balancer.
+      #  2. Delete HTTPRoutes, Gateways, GatewayClasses and LoadBalancer
+      #     Services while Gateway/cloud controllers and external-dns are alive.
+      #     Wait for resource deletion; stop on errors before deleting namespaces.
       #  3. Best effort: delete app namespaces so EBS volumes are released.
       #
       # Clusters that do not exist / are not ACTIVE are skipped.
@@ -181,122 +181,292 @@ jobs:
           MGMT_CLUSTER: ${{ steps.detect.outputs.management_cluster_name }}
           WORKLOAD_CLUSTER: ${{ steps.detect.outputs.workload_cluster_name }}
         run: |
+          #!/bin/bash
+          
+          # Exit immediately if:
+          # - any command fails (-e)
+          # - an undefined variable is used (-u)
+          # - a command inside a pipeline fails (-o pipefail)
           set -euo pipefail
 
+          # Create a temporary script that will be executed remotely via AWS Systems Manager (SSM)
           cat > /tmp/cleanup_body.sh <<'EOF'
-          set -uo pipefail
-          export HOME=/root
 
-          LB_WAIT="10m"   # ingress / service deletion (waits for AWS to delete the LB)
-          NS_WAIT="5m"    # namespace deletion (best effort)
-          # Namespaces that are never deleted. Add the namespace of any controller
-          # that must survive until the end (for example the EBS CSI driver).
+          # Similar safety settings for the remote script
+          set -uo pipefail
+
+          # How long to wait for:
+          # - Gateway API resources and LoadBalancer Services to be deleted
+          LB_WAIT="10m"
+
+          # - Kubernetes namespaces to be deleted
+          NS_WAIT="5m"
+
+          # Namespaces that should never be deleted.
+          # These contain core Kubernetes components or infrastructure services.
           KEEP_NS='^(default|kube-system|kube-public|kube-node-lease|argocd)$'
 
+          # Tracks whether any errors occurred during cleanup.
+          # 0 = success, 1 = at least one failure
           FAILED=0
+
+          # List of clusters that are reachable and ready for cleanup
           READY=()
 
-          kc() { kubectl --kubeconfig "/tmp/kubeconfig-${CUR}" "$@"; }
+          # Helper function that automatically uses the correct kubeconfig file
+          # for the cluster currently being processed.
+          kc() {
+            kubectl --kubeconfig "/tmp/kubeconfig-${CUR}" "$@"
+          }
+
+          ###############################################################################
+          # PHASE 0 - FIND CLUSTERS THAT EXIST AND CAN BE ACCESSED
+          ###############################################################################
 
           echo "##### Phase 0: check which clusters exist and are reachable"
+
           for C in ${CLUSTERS}; do
-            echo "=== ${C}"
-            if ! STATUS=$(aws eks describe-cluster --name "${C}" --region "${AWS_REGION}" \
-                --query cluster.status --output text 2>&1); then
+            echo "=== Checking cluster ${C}"
+
+            # Check whether the EKS cluster exists and get its current status.
+            if ! STATUS=$(aws eks describe-cluster \
+                --name "${C}" \
+                --region "${AWS_REGION}" \
+                --query cluster.status \
+                --output text 2>&1); then
+
+              # Cluster does not exist. Skip it.
               if grep -q ResourceNotFoundException <<<"${STATUS}"; then
-                echo "skip: cluster does not exist"
+                echo "Skip: cluster does not exist"
+
+              # Any other error should be reported.
               else
-                echo "ERROR: cannot describe cluster: ${STATUS}"
+                echo "ERROR: unable to check cluster status: ${STATUS}"
                 FAILED=1
               fi
               continue
             fi
+
+            # Only ACTIVE clusters can be cleaned up.
             if [[ "${STATUS}" != "ACTIVE" ]]; then
-              echo "skip: cluster status is ${STATUS}"
+              echo "Skip: cluster status is ${STATUS}"
               continue
             fi
-            if ! aws eks update-kubeconfig --name "${C}" --region "${AWS_REGION}" \
+
+            # Generate kubeconfig so kubectl can communicate with the cluster.
+            if ! aws eks update-kubeconfig \
+                --name "${C}" \
+                --region "${AWS_REGION}" \
                 --kubeconfig "/tmp/kubeconfig-${C}" >/dev/null 2>&1; then
-              echo "ERROR: update-kubeconfig failed for ${C}"
+
+              echo "ERROR: failed to create kubeconfig for ${C}"
               FAILED=1
               continue
             fi
+
             CUR="${C}"
+
+            # Verify that kubectl can successfully connect to the cluster.
             if ! kc get namespaces >/dev/null 2>&1; then
-              echo "ERROR: ${C} is ACTIVE but the admin instance cannot reach/authenticate to it"
+              echo "ERROR: cluster is running but cannot be accessed"
               FAILED=1
               continue
             fi
+
+            # Cluster is healthy and reachable.
             READY+=("${C}")
           done
 
+          # If no clusters are available, stop here.
           if [[ ${#READY[@]} -eq 0 ]]; then
             echo "No reachable clusters. Nothing to clean."
             exit ${FAILED}
           fi
 
+          ###############################################################################
+          # PHASE 1 - STOP ARGO CD
+          ###############################################################################
+
+          # Argo CD automatically recreates resources.
+          # We stop it first so deleted resources stay deleted.
+
           echo "##### Phase 1: stop Argo CD so it cannot recreate resources"
+
           for CUR in "${READY[@]}"; do
+
             if kc get namespace argocd >/dev/null 2>&1; then
-              echo "=== ${CUR}: scaling Argo CD to 0"
-              kc -n argocd scale deployment,statefulset --all --replicas=0 || FAILED=1
+
+              echo "=== ${CUR}: scaling Argo CD components to zero"
+
+              kc -n argocd scale deployment,statefulset \
+                --all \
+                --replicas=0 || FAILED=1
+
             else
-              echo "=== ${CUR}: no argocd namespace"
+              echo "=== ${CUR}: Argo CD not installed"
             fi
           done
+
+          # Give Kubernetes time to stop the Argo CD pods.
           sleep 15
 
-          echo "##### Phase 2: delete Ingresses and LoadBalancer Services"
+          ###############################################################################
+          # PHASE 2 - REMOVE LOAD BALANCERS AND DNS DEPENDENCIES
+          ###############################################################################
+
+          # This is whole-cluster cleanup for clusters being destroyed.
+          # Keep the Gateway controller, cloud LB controller and external-dns running.
+          # Gateway API CRDs are retained until the cluster itself is destroyed.
+          echo "##### Phase 2: delete Gateway API resources and LoadBalancer Services"
+
+          # Do not remove network resources if an earlier phase failed.
+          if (( FAILED != 0 )); then
+            echo "ERROR: an earlier cleanup phase failed"
+            exit 1
+          fi
+
           for CUR in "${READY[@]}"; do
             echo "=== ${CUR}"
-            COUNT=$(kc get ingress --all-namespaces --no-headers 2>/dev/null | wc -l)
+            COUNT=0
 
-            echo "Deleting Ingresses"
-            kc delete ingress --all --all-namespaces --wait=true --timeout="${LB_WAIT}" || {
-              echo "ERROR: ingress deletion did not finish"; FAILED=1; }
+            # Discover installed APIs. Missing Gateway API CRDs are valid on a
+            # partially bootstrapped cluster; discovery/authentication failures are not.
+            if ! APIS=$(kc api-resources --cached=false -o name); then
+              echo "ERROR: API discovery failed on ${CUR}"
+              exit 1
+            fi
 
-            echo "Deleting Services of type LoadBalancer"
+            # Delete routes before their Gateways, and Gateways before GatewayClasses.
+            # GatewayClasses are cluster-scoped and can have a gateway-exists finalizer.
+            for RESOURCE in \
+              httproutes.gateway.networking.k8s.io \
+              gateways.gateway.networking.k8s.io \
+              gatewayclasses.gateway.networking.k8s.io; do
+
+              if ! grep -Fxq "${RESOURCE}" <<<"${APIS}"; then
+                echo "Skip ${RESOURCE}: API is not installed"
+                continue
+              fi
+
+              SCOPE=(--all-namespaces)
+              if [[ "${RESOURCE}" == gatewayclasses.gateway.networking.k8s.io ]]; then
+                SCOPE=()
+              fi
+
+              if ! ITEMS=$(kc get "${RESOURCE}" "${SCOPE[@]}" -o name); then
+                echo "ERROR: could not list ${RESOURCE} on ${CUR}"
+                exit 1
+              fi
+              [[ -z "${ITEMS}" ]] && continue
+              COUNT=$((COUNT + 1))
+
+              if ! kc delete "${RESOURCE}" --all "${SCOPE[@]}" \
+                --wait=true --timeout="${LB_WAIT}"; then
+                echo "ERROR: ${RESOURCE} deletion failed; keeping controllers running"
+                exit 1
+              fi
+
+              # Give external-dns an opportunity to process removed routes while
+              # Gateway status still exists. This is not proof of DNS deletion;
+              # actual cleanup depends on its sources, policy and reconciliation interval.
+              if [[ "${RESOURCE}" == httproutes.gateway.networking.k8s.io ]]; then
+                echo "Allowing 90 seconds for route DNS reconciliation"
+                sleep 90
+              fi
+            done
+
+            # Gateway implementations may expose their proxy using a LoadBalancer
+            # Service. Deleting a Gateway does not always delete that shared Service.
+            # Capture the list explicitly so API failures cannot be hidden by a loop.
+            if ! SERVICES=$(kc get services --all-namespaces \
+              -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace} {.metadata.name}{"\n"}{end}'); then
+              echo "ERROR: could not list LoadBalancer Services on ${CUR}"
+              exit 1
+            fi
+
             while read -r NS NAME; do
               [[ -z "${NAME:-}" ]] && continue
               COUNT=$((COUNT + 1))
-              kc -n "${NS}" delete service "${NAME}" --wait=true --timeout="${LB_WAIT}" || {
-                echo "ERROR: service ${NS}/${NAME} deletion did not finish"; FAILED=1; }
-            done < <(kc get services --all-namespaces \
-              -o jsonpath='{range .items[?(@.spec.type=="LoadBalancer")]}{.metadata.namespace} {.metadata.name}{"\n"}{end}')
+              if ! kc -n "${NS}" delete service "${NAME}" \
+                --ignore-not-found=true --wait=true --timeout="${LB_WAIT}"; then
+                echo "ERROR: Service ${NS}/${NAME} deletion failed; keeping controllers running"
+                exit 1
+              fi
+            done <<<"${SERVICES}"
 
             if (( COUNT > 0 )); then
-              echo "Waiting 90s so external-dns can remove DNS records"
+              echo "Allowing 90 seconds for remaining DNS reconciliation"
               sleep 90
             fi
           done
 
-          echo "##### Phase 3 (best effort): delete app namespaces to release EBS volumes"
+          ###############################################################################
+          # PHASE 3 - DELETE APPLICATION NAMESPACES
+          ###############################################################################
+
+          # Removing application namespaces allows:
+          # - pods to terminate
+          # - persistent volume claims to detach
+          # - EBS volumes to be released
+
+          echo "##### Phase 3 (best effort): delete application namespaces"
+
           for CUR in "${READY[@]}"; do
+
             echo "=== ${CUR}"
+
             NAMESPACES=$(kc get namespaces -o jsonpath='{.items[*].metadata.name}')
+
             TO_DELETE=()
+
+            # Build a list of namespaces that are safe to remove.
             for NS in ${NAMESPACES}; do
+
+              # Skip protected namespaces.
               [[ "${NS}" =~ ${KEEP_NS} ]] && continue
+
               TO_DELETE+=("${NS}")
             done
+
+            # Request deletion of application namespaces.
             for NS in "${TO_DELETE[@]:-}"; do
               [[ -z "${NS}" ]] && continue
               kc delete namespace "${NS}" --wait=false || true
             done
+
+            # Wait for namespace deletion.
             for NS in "${TO_DELETE[@]:-}"; do
               [[ -z "${NS}" ]] && continue
-              kc wait --for=delete "namespace/${NS}" --timeout="${NS_WAIT}" \
-                || echo "WARNING: namespace ${NS} is still terminating"
+
+              kc wait \
+                --for=delete \
+                "namespace/${NS}" \
+                --timeout="${NS_WAIT}" || \
+                echo "WARNING: namespace ${NS} is still terminating"
             done
+
+            # Check whether any Persistent Volumes still exist.
             LEFT=$(kc get persistentvolumes --no-headers 2>/dev/null | wc -l)
+
             if (( LEFT > 0 )); then
-              echo "WARNING: ${LEFT} PersistentVolume(s) remain in ${CUR}; check EC2 > Volumes for leftovers"
+              echo "WARNING: ${LEFT} PersistentVolume(s) remain."
+              echo "Check AWS EC2 Volumes for leftover storage."
             fi
+
           done
 
+          # Return success or failure status.
           exit ${FAILED}
           EOF
 
+          ###############################################################################
+          # BUILD FINAL SCRIPT
+          ###############################################################################
+
+          # Build a complete script containing:
+          # - AWS region
+          # - cluster names
+          # - cleanup logic
           {
             echo '#!/bin/bash'
             printf 'export AWS_REGION=%q\n' "${AWS_REGION}"
@@ -304,39 +474,78 @@ jobs:
             cat /tmp/cleanup_body.sh
           } > /tmp/cleanup.sh
 
+          ###############################################################################
+          # EXECUTE SCRIPT THROUGH AWS SSM
+          ###############################################################################
+
+          # Send the cleanup script to the remote EC2 instance using AWS Systems Manager.
           CMD_ID=$(aws ssm send-command \
             --instance-ids "${INSTANCE_ID}" \
             --document-name "AWS-RunShellScript" \
             --comment "k8s-cleanup-${GITHUB_RUN_ID}" \
             --timeout-seconds 600 \
-            --parameters "$(jq -n --arg s "$(cat /tmp/cleanup.sh)" '{commands:[$s], executionTimeout:["3000"]}')" \
+            --parameters "$(jq -n \
+              --arg s "$(cat /tmp/cleanup.sh)" \
+              '{commands:[$s], executionTimeout:["3000"]}')" \
             --query 'Command.CommandId' \
             --output text)
+
           echo "SSM command id=${CMD_ID}"
 
-          # Poll (the built-in waiter gives up after ~100s). Up to 50 minutes.
+          ###############################################################################
+          # WAIT FOR REMOTE SCRIPT TO FINISH
+          ###############################################################################
+
           STATUS=Pending
+
+          # Check status every 10 seconds for up to 50 minutes.
           for i in $(seq 1 300); do
+
             STATUS=$(aws ssm get-command-invocation \
               --command-id "${CMD_ID}" \
               --instance-id "${INSTANCE_ID}" \
               --query Status \
               --output text 2>/dev/null || echo Pending)
+
             echo "SSM status=${STATUS}"
+
             case "${STATUS}" in
-              Success|Failed|Cancelled|TimedOut) break ;;
+              Success|Failed|Cancelled|TimedOut)
+                break
+                ;;
             esac
+
             sleep 10
           done
 
-          echo "----- cleanup output -----"
-          aws ssm get-command-invocation --command-id "${CMD_ID}" --instance-id "${INSTANCE_ID}" \
-            --query StandardOutputContent --output text
-          echo "----- cleanup errors -----"
-          aws ssm get-command-invocation --command-id "${CMD_ID}" --instance-id "${INSTANCE_ID}" \
-            --query StandardErrorContent --output text
+          ###############################################################################
+          # DISPLAY SCRIPT OUTPUT
+          ###############################################################################
 
-          # If this fails, terraform destroy does NOT run, so nothing is orphaned.
+          echo "----- cleanup output -----"
+
+          aws ssm get-command-invocation \
+            --command-id "${CMD_ID}" \
+            --instance-id "${INSTANCE_ID}" \
+            --query StandardOutputContent \
+            --output text
+
+          echo "----- cleanup errors -----"
+
+          aws ssm get-command-invocation \
+            --command-id "${CMD_ID}" \
+            --instance-id "${INSTANCE_ID}" \
+            --query StandardErrorContent \
+            --output text
+
+          ###############################################################################
+          # FINAL SAFETY CHECK
+          ###############################################################################
+
+          # If cleanup did not succeed, the script exits with failure.
+          # This prevents Terraform destroy from running and potentially
+          # leaving AWS resources orphaned.
+
           [[ "${STATUS}" == "Success" ]]
 
       - name: Terraform destroy plan
