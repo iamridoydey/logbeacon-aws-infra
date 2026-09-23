@@ -1,0 +1,5 @@
+environment       = "env"
+github_username   = "github username"
+github_account_id = "github account id"
+github_repo_id    = "github repo id"
+github_logbeacon_app_repo_id = "github logbeacon app repo id"
