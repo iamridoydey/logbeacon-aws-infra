@@ -79,6 +79,10 @@ variable "logbeacon_secrets" {
     smtp_password = string
     from_email    = string
 
+    # Grafana
+    grafana_admin_user = string
+    grafana_admin_password = string
+
     # Frontend
     session_secret = string
 
