@@ -104,6 +104,39 @@ resource "aws_secretsmanager_secret_version" "logbeacon_smtp" {
 
 
 # =============================================================
+# LOGBEACON GRAFANA SECRET
+# =============================================================
+
+resource "aws_secretsmanager_secret" "logbeacon_grafana" {
+  name        = "logbeacon/grafana"
+  description = "LogBeacon grafana credentials."
+  kms_key_id  = aws_kms_key.logbeacon_kms_key.id
+
+  recovery_window_in_days = 0
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "logbeacon-grafana"
+    }
+  )
+
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
+}
+
+
+resource "aws_secretsmanager_secret_version" "logbeacon_grafana" {
+  secret_id = aws_secretsmanager_secret.logbeacon_grafana.id
+
+  secret_string = jsonencode({
+    GRAFANA_ADMIN_USER     = var.logbeacon_secrets.grafana_admin_user
+    GRAFANA_ADMIN_PASSWORD = var.logbeacon_secrets.grafana_admin_password
+  })
+}
+
+# =============================================================
 # LOGBEACON CLOUDFLARE SECRET
 # =============================================================
 
