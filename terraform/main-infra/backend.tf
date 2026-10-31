@@ -13,7 +13,7 @@ terraform {
     }
   }
   backend "s3" {
-    bucket       = "logbeacon-state-file"
+    bucket       = "logbeacon-proj-state-file"
     key          = "logbeacon.terraform.tfstate"
     region       = "us-east-1"
     encrypt      = true
