@@ -7,7 +7,7 @@ locals {
 
 
 
-  state_bucket = "logbeacon-state-file"
+  state_bucket = var.state_bucket_name
   state_key    = "logbeacon.terraform.tfstate"
   lock_key     = "logbeacon.terraform.tfstate.tflock"
 

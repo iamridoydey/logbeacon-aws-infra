@@ -13,6 +13,11 @@ variable "default_region" {
   default     = "us-east-1"
 }
 
+variable "state_bucket_name" {
+  description = "State bucket name"
+  type        = string
+}
+
 variable "environment" {
   description = "Environment"
   type        = string
