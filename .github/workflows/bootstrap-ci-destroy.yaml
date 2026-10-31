@@ -38,6 +38,7 @@ jobs:
         run: |
           cat > terraform.tfvars <<EOF
           environment       = "${{ vars.ENVIRONMENT }}"
+          state_bucket_name = "${{ vars.STATE_BUCKET_NAME }}"
           github_username   = "${{ vars.GH_USERNAME }}"
           github_account_id = "${{ vars.GH_ACCOUNT_ID }}"
           github_repo_id    = "${{ vars.GH_REPO_ID }}"

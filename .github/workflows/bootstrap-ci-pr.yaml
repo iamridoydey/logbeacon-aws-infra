@@ -94,6 +94,7 @@ jobs:
         working-directory: terraform/bootstrap-infra
         run: |
           cat > terraform.tfvars <<EOF
+          state_bucket_name = "${{ vars.STATE_BUCKET_NAME }}"
           environment       = "${{ vars.ENVIRONMENT }}"
           github_username   = "${{ vars.GH_USERNAME }}"
           github_account_id = "${{ vars.GH_ACCOUNT_ID }}"
