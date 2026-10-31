@@ -40,5 +40,4 @@ variable "github_repo_id" {
 variable "s3_state_bucket_arn" {
   description = "S3 state bucket arn"
   type        = string
-  default     = "arn:aws:s3:::logbeacon-state-file"
 }
