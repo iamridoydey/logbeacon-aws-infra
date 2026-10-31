@@ -93,7 +93,7 @@ module "workload_eks" {
       ami_type = "AL2023_x86_64_STANDARD"
 
       instance_types = [
-        "t3.large"
+        "c7i-flex.large"
       ]
 
       min_size     = 2
@@ -254,7 +254,7 @@ module "management_eks" {
       ami_type = "AL2023_x86_64_STANDARD"
 
       instance_types = [
-        "t3.medium"
+        "c7i-flex.large"
       ]
 
       min_size     = 2
