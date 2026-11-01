@@ -51,6 +51,7 @@ jobs:
           CLOUDFLARE_SECRETS_HCL: ${{ secrets.CLOUDFLARE_SECRETS }}
           SONARQUBE_ADMIN_PASSWORD: ${{ secrets.SONARQUBE_ADMIN_PASSWORD }}
           SONARQUBE_MONITORING_PASSCODE: ${{ secrets.SONARQUBE_MONITORING_PASSCODE }}
+          ARGOCD_ADMIN_PASSWORD: ${{ secrets.ARGOCD_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
           umask 077
@@ -59,6 +60,7 @@ jobs:
           github_secrets = ${GITHUB_SECRETS_HCL}
           cloudflare_secrets = ${CLOUDFLARE_SECRETS_HCL}
           sonarqube_admin_password = "${SONARQUBE_ADMIN_PASSWORD}"
+          argocd_admin_password = "${ARGOCD_ADMIN_PASSWORD}"
           environment = "${{ vars.ENVIRONMENT }}"
           sonarqube_monitoring_passcode = "${SONARQUBE_MONITORING_PASSCODE}"
           EOF

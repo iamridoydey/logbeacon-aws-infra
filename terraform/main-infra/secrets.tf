@@ -285,7 +285,7 @@ resource "aws_secretsmanager_secret_version" "workload_eks_cred" {
 # =============================================================
 
 resource "aws_secretsmanager_secret" "sonarqube_admin_password" {
-  name        = "sonarqube-admin-password"
+  name        = "logbeacon/sonarqube-admin-password"
   description = "SonarQube administrator password."
   kms_key_id  = aws_kms_key.logbeacon_kms_key.id
 
@@ -311,6 +311,36 @@ resource "aws_secretsmanager_secret_version" "sonarqube_admin_password" {
     ADMIN_PASSWORD = var.sonarqube_admin_password
   })
 }
+
+
+
+# =============================================================
+# ARGOCD ADMIN PASSWORD
+# =============================================================
+
+resource "aws_secretsmanager_secret" "argocd_admin_password" {
+  name        = "logbeacon/argocd-admin-password"
+  description = "Argo CD administrator password."
+  kms_key_id  = aws_kms_key.logbeacon_kms_key.id
+
+  recovery_window_in_days = 0
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "argocd-admin-password"
+    }
+  )
+}
+
+resource "aws_secretsmanager_secret_version" "argocd_admin_password" {
+  secret_id = aws_secretsmanager_secret.argocd_admin_password.id
+
+  secret_string = jsonencode({
+    ARGOCD_ADMIN_PASSWORD = var.argocd_admin_password
+  })
+}
+
 
 
 # =============================================================

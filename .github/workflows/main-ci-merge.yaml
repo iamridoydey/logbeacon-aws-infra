@@ -32,7 +32,6 @@ jobs:
       TF_DIR: terraform/main-infra
 
     steps:
-      # Same action majors as the rest of the project pipelines.
       - name: Clone the repository
         uses: actions/checkout@v7
 
@@ -61,6 +60,7 @@ jobs:
           CLOUDFLARE_SECRETS_HCL: ${{ secrets.CLOUDFLARE_SECRETS }}
           SONARQUBE_ADMIN_PASSWORD: ${{ secrets.SONARQUBE_ADMIN_PASSWORD }}
           SONARQUBE_MONITORING_PASSCODE: ${{ secrets.SONARQUBE_MONITORING_PASSCODE }}
+          ARGOCD_ADMIN_PASSWORD: ${{ secrets.ARGOCD_ADMIN_PASSWORD }}
         run: |
           set -euo pipefail
           umask 077
@@ -69,6 +69,7 @@ jobs:
           github_secrets = ${GITHUB_SECRETS_HCL}
           cloudflare_secrets = ${CLOUDFLARE_SECRETS_HCL}
           sonarqube_admin_password = "${SONARQUBE_ADMIN_PASSWORD}"
+          argocd_admin_password = "${ARGOCD_ADMIN_PASSWORD}"
           environment = "${{ vars.ENVIRONMENT }}"
           sonarqube_monitoring_passcode = "${SONARQUBE_MONITORING_PASSCODE}"
           EOF
@@ -140,8 +141,9 @@ jobs:
       # send-command = fire a script and wait.
       # start-session = interactive login (useless in CI).
       #
-      # Instance profile must allow eks:DescribeCluster (update-kubeconfig)
-      # and the instance must reach the EKS API.
+      # Instance profile must allow:
+      #   - eks:DescribeCluster (for update-kubeconfig)
+      #   - secretsmanager:GetSecretValue on logbeacon/argocd-admin-password
       #
       # Why send-command?
       # There is no interactive CLI user on the runner.
@@ -154,27 +156,63 @@ jobs:
         run: |
           set -euo pipefail
 
-          cat > /tmp/bootstrap.sh <<EOF
+          # Write the bootstrap script that will run on the admin EC2
+          cat > /tmp/bootstrap.sh <<'EOF'
           #!/bin/bash
           set -euo pipefail
           export HOME=/root
           export AWS_REGION="${AWS_REGION}"
+
+          # Connect kubectl to the management EKS cluster
           aws eks update-kubeconfig --name "${CLUSTER}" --region "${AWS_REGION}"
+
+          # Clone or update the GitOps repo that contains Argo CD values and apps
           if [ ! -d /opt/logbeacon-aws-k8s ]; then
             git clone https://github.com/${GITHUB_USERNAME}/logbeacon-aws-k8s.git /opt/logbeacon-aws-k8s
           else
             git -C /opt/logbeacon-aws-k8s pull --ff-only
           fi
+
+          # Pull Argo CD admin password from AWS Secrets Manager
+          ARGOCD_PASSWORD=$(aws secretsmanager get-secret-value \
+            --secret-id "logbeacon/argocd-admin-password" \
+            --query 'SecretString' \
+            --output text | jq -r '.ARGOCD_ADMIN_PASSWORD')
+
+          if [ -z "${ARGOCD_PASSWORD}" ] || [ "${ARGOCD_PASSWORD}" = "null" ]; then
+            echo "ERROR: Failed to retrieve Argo CD admin password from Secrets Manager"
+            exit 1
+          fi
+
+          # Generate bcrypt hash required by the Argo CD Helm chart
+          # Install htpasswd if it is not already present
+          if ! command -v htpasswd >/dev/null 2>&1; then
+            apt-get update -qq && apt-get install -y -qq apache2-utils
+          fi
+          ARGOCD_PASSWORD_HASH=$(htpasswd -nbBC 10 "" "${ARGOCD_PASSWORD}" | tr -d ':\n' | sed 's/$2y/$2a/')
+
+          # Add Argo CD Helm repository
           helm repo add argo https://argoproj.github.io/argo-helm
           helm repo update
+
+          # Install or upgrade Argo CD and set the admin password
           helm upgrade --install argocd argo/argo-cd \
             --namespace argocd \
             --create-namespace \
             --wait \
-            -f /opt/logbeacon-aws-k8s/argocd/argocd-values.yaml
+            --timeout 10m \
+            -f /opt/logbeacon-aws-k8s/argocd/argocd-values.yaml \
+            --set-string configs.secret.argocdServerAdminPassword="${ARGOCD_PASSWORD_HASH}" \
+            --set configs.secret.argocdServerAdminPasswordMtime="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          # Apply the root Application that bootstraps the rest of the cluster
           kubectl apply -f /opt/logbeacon-aws-k8s/argocd/management-root.yaml
           EOF
 
+          # Inject the real values into the script (heredoc above used literal ${...})
+          sed -i "s|\${AWS_REGION}|${AWS_REGION}|g; s|\${CLUSTER}|${CLUSTER}|g; s|\${GITHUB_USERNAME}|${GITHUB_USERNAME}|g" /tmp/bootstrap.sh
+
+          # Send the script to the admin EC2 via SSM and wait for it to finish
           CMD_ID=$(aws ssm send-command \
             --instance-ids "${INSTANCE_ID}" \
             --document-name "AWS-RunShellScript" \
@@ -185,7 +223,7 @@ jobs:
             --output text)
           echo "SSM command id=${CMD_ID}"
 
-          # Poll instead of `aws ssm wait` (its waiter gives up after ~100s)
+          # Poll until the SSM command finishes (aws ssm wait times out too early)
           STATUS=Pending
           for i in $(seq 1 180); do
             STATUS=$(aws ssm get-command-invocation \
@@ -198,11 +236,13 @@ jobs:
             sleep 10
           done
 
+          # Print the full output for debugging
           aws ssm get-command-invocation \
             --command-id "${CMD_ID}" --instance-id "${INSTANCE_ID}" \
             --query '{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}' \
             --output json
 
+          # Fail the workflow if the bootstrap script did not succeed
           [[ "${STATUS}" == "Success" ]]
 
       # From here ArgoCD app-of-apps reconciles downstream apps
