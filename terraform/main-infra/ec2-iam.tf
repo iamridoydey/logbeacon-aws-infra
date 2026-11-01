@@ -84,6 +84,18 @@ resource "aws_iam_role_policy_attachment" "logbeacon_admin_eks" {
 }
 
 
+resource "aws_iam_role_policy_attachment" "logbeacon_argocd_admin_password" {
+  role       = aws_iam_role.logbeacon_admin_role.name
+  policy_arn = aws_iam_policy.logbeacon_secrets_policy.arn
+}
+
+
+resource "aws_iam_role_policy_attachment" "logbeacon_admin_kms" {
+  role       = aws_iam_role.logbeacon_admin_role.name
+  policy_arn = aws_iam_policy.secret_kms_decrypt.arn
+}
+
+
 # =============================================================
 # SSM AGENT ON EC2 NEED POLICY TO TALK WITH SSM SERVICE
 # =============================================================
