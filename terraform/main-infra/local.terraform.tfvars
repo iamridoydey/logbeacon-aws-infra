@@ -6,7 +6,9 @@ logbeacon_secrets = {
   smtp_password                  = "smtp password"
   from_email                     = "email"
 
-  session_secret = "session secret "
+  grafana_admin_user = "admin username"
+  grafana_admin_password = "admin password"
+  session_secret = "session secret"
 
   postgres_user     = "postgres user"
   postgres_password = "postgres password"
@@ -27,6 +29,7 @@ cloudflare_secrets = {
 
 
 sonarqube_admin_password = "admin pass"
+argocd_admin_password = "admin pass"
 environment              = "env"
 
 sonarqube_monitoring_passcode = "sonarqube monitoring passcode"

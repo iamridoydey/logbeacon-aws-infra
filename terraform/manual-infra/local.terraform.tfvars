@@ -1,3 +1,4 @@
+s3_state_bucket_arn = "arn:aws:s3:::your-state-bucket-name"
 environment = "env"
 github_username = "github username"
 github_account_id = "github account id"

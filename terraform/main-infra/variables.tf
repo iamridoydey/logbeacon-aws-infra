@@ -125,3 +125,10 @@ variable "sonarqube_admin_password" {
   type        = string
   sensitive   = true
 }
+
+
+variable "argocd_admin_password" {
+  description = "Argocd admin password"
+  type        = string
+  sensitive   = true
+}
